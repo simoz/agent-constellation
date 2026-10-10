@@ -4,6 +4,8 @@ Usage: python3 -B demo/fixtures.py OUTPUT_DIR PID [--scene live|wait]
 
 PID must be a running process that outlives the capture (demo/run starts one):
 Claude Code session records are shown only while their process is alive.
+Codex threads are shown only while their lock file, printed on stdout, is held
+(demo/run holds it with flock).
 Every project, path and command here is invented.
 """
 
@@ -91,7 +93,7 @@ def main():
         claude_session(claude, pid, "a1b2c3d4-0000-4000-8000-000000000002", "poems", "busy", poems[:-1])
     day = output / "codex" / "sessions" / time.strftime("%Y/%m/%d")
     cwd = f"{HOME}/work/recipes"
-    events = [{"timestamp": iso(300), "type": "session_meta", "payload": {"cwd": cwd}},
+    events = [{"timestamp": iso(300), "type": "session_meta", "payload": {"id": "0000demo", "cwd": cwd}},
               {"timestamp": iso(300), "type": "event_msg", "payload": {"type": "thread_settings_applied", "thread_settings": {"model": "gpt-5-codex"}}},
               {"timestamp": iso(290), "type": "event_msg", "payload": {"type": "task_started"}}]
     for i, path in enumerate(["app/services/recipe_scaler.rb", "app/models/ingredient.rb", "test/services/recipe_scaler_test.rb", "app/models/recipe.rb"]):
@@ -105,6 +107,10 @@ def main():
     events.append({"timestamp": iso(6), "type": "event_msg", "payload": {"type": "item_completed", "item": {
         "type": "CommandExecution", "command": ["/bin/bash", "-lc", "bin/rails test test/services"], "parsed_cmd": [{"type": "unknown"}]}}})
     write(day / "rollout-2026-10-10T10-00-00-0000demo.jsonl", events)
+    lock = output / "codex" / "thread-writer-locks" / "0000demo.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.touch()
+    print(lock)
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ work=$(mktemp -d /tmp/constellation-demo.XXXXXX)
 # Fixture sessions are visible only while their process is alive.
 sleep 600 & holder=$!
 preview=
-trap 'kill "$holder" 2>/dev/null || true; rm -rf -- "$work" ${preview:+"$preview"}' EXIT
+codex_holder=
+trap 'kill "$holder" $codex_holder 2>/dev/null || true; rm -rf -- "$work" ${preview:+"$preview"}' EXIT
 preview=$(python3 -B "$repository_dir/tools/prepare_preview.py")
 theme_file() {
   mkdir -p "$work/state/omarchy/current/theme"
@@ -26,12 +27,15 @@ render() {
   local scene="$1" name="$2" theme="$3"
   theme_file "$theme"
   rm -rf "$work/sessions" && mkdir -p "$work/sessions"
-  python3 -B "$repository_dir/demo/fixtures.py" "$work/sessions" "$holder" --scene "$scene"
+  lock=$(python3 -B "$repository_dir/demo/fixtures.py" "$work/sessions" "$holder" --scene "$scene")
+  # The sleep itself holds the lock, so killing it releases the lock.
+  (exec 9>"$lock" && flock 9 && exec sleep 600) & codex_holder=$!
   env XDG_CONFIG_HOME="$work/config" XDG_STATE_HOME="$work/state" TZ=UTC \
     QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic \
     CONSTELLATION_CLAUDE_DIR="$work/sessions/claude" CONSTELLATION_CODEX_DIR="$work/sessions/codex" \
     CONSTELLATION_THEME="$theme" CONSTELLATION_CAPTURE="$output/$name.png" \
     timeout 60 qs -p "$preview" >/dev/null 2>&1
+  kill "$codex_holder" 2>/dev/null || true
   printf '%s\n' "$output/$name.png"
 }
 render live live dark

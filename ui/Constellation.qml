@@ -24,7 +24,9 @@ FocusScope {
     readonly property var scene: {
         // The service sorts by status for the list; the scene keeps a stable order so
         // a core does not jump when its agent starts waiting.
-        var agents = service.agents.slice().sort(function(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+        // Zoom keeps only the selected agent, laid out alone at full size.
+        var agents = service.zooming ? [service.selected]
+            : service.agents.slice().sort(function(a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
         var list = Model.centres(agents.length, width / Math.max(1, height));
         var radius = Model.reach(agents.length, width, height);
         // Files spread wider than tall (orbits are flattened to 0.82), labels sit below the core.
@@ -35,12 +37,13 @@ FocusScope {
                     files: Model.fileNodes(agent, x, y, radius)};
         });
     }
-    readonly property string paintKey: JSON.stringify(service.snapshot ? service.snapshot.sequence : 0) + service.selection
+    readonly property string paintKey: JSON.stringify(service.snapshot ? service.snapshot.sequence : 0) + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
 
     function css(c, a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + (a === undefined ? c.a : a) + ")"; }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
+    function zoomTo(id) { service.selection = id; service.zoomed = true; }
     function font(weight, size) { return weight + " " + Math.round(size * scale) + "px \"" + fontFamily + "\""; }
     function dashed(c, x1, y1, x2, y2, dash, gap) {
         var length = Math.hypot(x2 - x1, y2 - y1), step = dash + gap;
@@ -74,12 +77,15 @@ FocusScope {
 
     activeFocusOnTab: true
     Accessible.role: Accessible.Graphic
-    Accessible.name: service.agents.length ? service.agents.length + " agents in the constellation. Arrow keys select an agent." : "No active agents"
+    Accessible.name: service.zooming ? "Zoomed on " + Model.agentTitle(service.selected) + ". Escape shows all agents."
+        : service.agents.length ? service.agents.length + " agents in the constellation. Arrow keys select an agent, Enter zooms." : "No active agents"
     Keys.onPressed: function(event) {
         if (event.modifiers !== Qt.NoModifier) return;
         if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) step(1);
         else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) step(-1);
         else if (event.key === Qt.Key_Home && service.selection) service.selection = "";
+        else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && service.selection) service.zoomed = !service.zoomed;
+        else if (event.key === Qt.Key_Escape && service.zooming) service.zoomed = false;
         else return;
         event.accepted = true;
     }
@@ -151,8 +157,8 @@ FocusScope {
                 var dim = root.dimmed(entry) ? 0.35 : 1, agent = entry.agent;
                 entry.files.forEach(function(node) {
                     c.font = root.font(400, 11); c.fillStyle = root.css(fg, (0.35 + node.heat * 0.55) * dim);
-                    c.fillText(node.name, node.x, node.y + 20 + node.heat * 5);
-                    if ((node.file.added || node.file.removed) && node.heat > 0.25) {
+                    c.fillText(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 + node.heat * 5);
+                    if ((node.file.added || node.file.removed) && (node.heat > 0.25 || root.service.zooming)) {
                         c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.role("green"), 0.8 * dim);
                         c.fillText("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
                     }
@@ -183,7 +189,7 @@ FocusScope {
                 scale: root.scale
                 fontFamily: root.fontFamily
                 time: root.time
-                opacity: root.dimmed(entry) ? 0.3 : 1
+                opacity: entry && root.dimmed(entry) ? 0.3 : 1
             }
         }
     }
@@ -230,6 +236,10 @@ FocusScope {
             root.forceActiveFocus();
             var id = root.agentAt(mouse.x, mouse.y);
             if (id) root.service.select(id); else root.service.selection = "";
+        }
+        onDoubleClicked: function(mouse) {
+            var id = root.agentAt(mouse.x, mouse.y);
+            if (id) root.zoomTo(id);
         }
     }
     Column {

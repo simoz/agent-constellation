@@ -42,13 +42,17 @@ FocusScope {
             else if (event.key === Qt.Key_P) collectionToggle.clicked();
             else if (event.key === Qt.Key_G) motionButton.clicked();
             else if (event.key === Qt.Key_T) root.service.focusAgent(root.terminalTarget());
+            else if (event.key === Qt.Key_Z && zoomButton.enabled) zoomButton.clicked();
             else if (event.key === Qt.Key_E && root.surfaceSwitchAvailable) surfaceSwitch.clicked();
             else if (event.key === Qt.Key_Comma) settingsButton.clicked();
             else return;
         } else return;
         event.accepted = true;
     }
-    Keys.onEscapePressed: function(event) { closeRequested(); event.accepted = true; }
+    Keys.onEscapePressed: function(event) {
+        if (root.service.zooming) root.service.zoomed = false; else closeRequested();
+        event.accepted = true;
+    }
     Connections {
         target: root.Window.window
         function onActiveFocusItemChanged() {
@@ -162,6 +166,17 @@ FocusScope {
                     Row {
                         anchors { right: parent.right; bottom: parent.bottom; margins: 12 }
                         spacing: 4
+                        ActionButton {
+                            id: zoomButton
+                            objectName: "zoomButton"
+                            text: root.service.zooming ? "⊖" : "⊕"
+                            implicitWidth: 28; implicitHeight: 26
+                            enabled: root.service.selected !== null
+                            hint: root.service.zooming ? "Show all agents (Ctrl+Z, Esc)" : "Zoom into the selected agent (Ctrl+Z)"
+                            C.ToolTip.visible: hovered
+                            C.ToolTip.text: hint
+                            onClicked: root.service.zoomed = !root.service.zooming
+                        }
                         ActionButton {
                             id: terminalButton
                             objectName: "terminalButton"

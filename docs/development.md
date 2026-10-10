@@ -78,7 +78,8 @@ rm -rf -- "$preview"
 
 Controls: `CONSTELLATION_THEME` (`light`/`dark`, otherwise the installed
 theme), `CONSTELLATION_WIDTH`, `CONSTELLATION_HEIGHT`,
-`CONSTELLATION_CAPTURE_DELAY` and `CONSTELLATION_BENCHMARK=1`, which reports
-timer intervals and static-canvas repaints over 120 ticks. After changes to the
+`CONSTELLATION_CAPTURE_DELAY`, `CONSTELLATION_ZOOM=1` (zoom into the first
+agent) and `CONSTELLATION_BENCHMARK=1`, which reports timer intervals, rendered
+frames per second and static-canvas repaints over 120 ticks. After changes to the
 moving parts, compare the preview's CPU use with `CONSTELLATION_STILL=1`
 (animation off), for example with `top -p`.

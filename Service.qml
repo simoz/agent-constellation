@@ -87,6 +87,10 @@ Item {
     function validIdle(minutes) { return Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440; }
 
     property string selection: ""
+    // Zoom shows only the selected agent; it ends with the selection.
+    property bool zoomed: false
+    readonly property bool zooming: zoomed && selected !== null
+    onSelectionChanged: if (!selection) zoomed = false
     // Not a user setting: the host exposes no reduced-motion preference. Kept for
     // tests, captures and a future accessibility option.
     property bool reducedMotion: false

@@ -34,6 +34,9 @@ Item {
         property var events: [{atMs: 1800000000000, agent: "claude:a", subagent: "", tool: "Edit", target: "a.rb"}]
         readonly property var totals: Model.summary(agents)
         readonly property var selected: agents.filter(function(a) { return a.id === selection; })[0] || null
+        property bool zoomed: false
+        readonly property bool zooming: zoomed && selected !== null
+        onSelectionChanged: if (!selection) zoomed = false
         property bool claudeEnabled: true
         property bool codexEnabled: true
         property string claudeDir: ""
@@ -68,7 +71,7 @@ Item {
         name: "Dashboard"
         when: windowShown
         function init() {
-            service.paused = false; service.animating = true; service.selection = ""; service.refreshes = 0; service.focused = [];
+            service.paused = false; service.animating = true; service.selection = ""; service.refreshes = 0; service.focused = []; service.zoomed = false;
             closeSpy.clear(); expandSpy.clear();
             dashboard.scene.forceActiveFocus();
         }
@@ -120,6 +123,26 @@ Item {
             compare(service.focused, [null, "claude:a", "codex:b"]);
             service.selection = "codex:b";
             verify(!button.enabled);
+        }
+        function test_zoom_follows_selection() {
+            var button = findChild(dashboard, "zoomButton");
+            verify(!button.enabled);
+            keyClick(Qt.Key_Right);
+            keyClick(Qt.Key_Return);
+            compare(service.zooming, true);
+            compare(dashboard.scene.scene.length, 1);
+            keyClick(Qt.Key_Right);
+            compare(service.selection, "codex:b");
+            compare(service.zooming, true, "arrows keep the zoom on the next agent");
+            keyClick(Qt.Key_Escape);
+            compare(service.zooming, false);
+            compare(closeSpy.count, 0, "Escape leaves the zoom before closing");
+            compare(dashboard.scene.scene.length, 2);
+            keyClick(Qt.Key_Z, Qt.ControlModifier);
+            compare(service.zooming, true);
+            keyClick(Qt.Key_Home);
+            compare(service.zooming, false);
+            compare(service.zoomed, false);
         }
         function test_help_and_escape() {
             var help = findChild(dashboard, "constellationKeyboardHelp");

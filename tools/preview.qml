@@ -11,6 +11,8 @@ ShellRoot {
     id: root
     property var sampleIntervals: []
     property double previousTick: 0
+    property int frames: 0
+    property double startedAt: 0
     Core.Settings {
         id: preferences
         location: "file://" + (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config") + "/agent-constellation/preview.ini"
@@ -46,6 +48,8 @@ ShellRoot {
         width: Number(Quickshell.env("CONSTELLATION_WIDTH")) || 1440
         height: Number(Quickshell.env("CONSTELLATION_HEIGHT")) || 920
         title: "Agent Constellation — live preview"
+        // Rendered frames, for the benchmark's frames per second.
+        onFrameSwapped: root.frames++
         Constellation.Dashboard {
             id: dashboard
             anchors.fill: parent
@@ -69,8 +73,12 @@ ShellRoot {
                 Color.foreground = light ? "#575279" : "#a9b1d6";
                 Color.accent = light ? "#286983" : "#7aa2f7";
             }
+            if (Quickshell.env("CONSTELLATION_ZOOM") === "1" && service.agents.length)
+                dashboard.scene.zoomTo(service.agents[0].id);
             if (Quickshell.env("CONSTELLATION_BENCHMARK")) {
                 previousTick = Date.now();
+                startedAt = previousTick;
+                frames = 0;
                 benchmark.start();
             } else capture.start();
         }
@@ -92,6 +100,8 @@ ShellRoot {
                 meanIntervalMs: root.sampleIntervals.reduce(function(a, b) { return a + b; }, 0) / sorted.length,
                 p95IntervalMs: sorted[Math.floor(sorted.length * 0.95)],
                 canvasPaints: dashboard.scene.paintCount,
+                framesPerSecond: Math.round(root.frames * 10000 / (now - root.startedAt)) / 10,
+                zoomed: service.zooming,
                 agents: service.agents.length
             }));
             Qt.quit();

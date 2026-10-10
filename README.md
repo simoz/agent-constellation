@@ -89,7 +89,12 @@ has focus, editing keys take priority.
 | Ctrl+, | Open Settings |
 | Ctrl+G | Pause / resume the animation |
 | Ctrl+Shift+R | Show all agents again |
+| Ctrl+Z | Zoom into the selected agent / show all agents |
 | Ctrl+T | Go to the terminal of the focused agent card, or of the selected agent |
+
+Zoom shows one session alone, with file paths and line counts; double-click
+a core, or select an agent and use **⊕**. The arrows move to the next session
+while zoomed; Esc, Home or **↺** show all agents again.
 
 With the mouse, double-click an agent card, or select an agent and use **↗**.
 The terminal is found among the windows of the agent's parent processes. A
@@ -104,13 +109,14 @@ Settings is open.
 | Controls | Tab / Shift+Tab | Move to the next / previous control |
 | Button or agent card | Enter / Space | Activate the button, or highlight the agent |
 | Constellation | ← / ↑ / → / ↓ | Select the previous / next agent |
+| Constellation | Enter | Zoom into the selected agent, or zoom out |
 | Constellation | Home | Show all agents again |
 | Agent list | ↑ / ↓ | Move between cards |
 | Event list | ↑ / ↓ / PgUp / PgDn | Scroll |
 | KEYS guide | ↑ / ↓ / PgUp / PgDn | Scroll the guide |
 | Dashboard / KEYS guide | F1 | Open / close the guide |
 | Settings or guide | Esc | Close that popup |
-| Dashboard | Esc | Close Agent Constellation |
+| Dashboard | Esc | Leave the zoom; otherwise close Agent Constellation |
 
 ## What the data means
 

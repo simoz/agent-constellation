@@ -22,7 +22,9 @@ collector reads local agent session files; nothing else runs outside the shell.
   from one scene clock ticking at 30 fps, only while the view is visible and
   animation is on. A full-window canvas repainted every frame cost about a third
   of a core inside the shell; vsync-driven animations still rendered at 60 fps.
-  With the timer, an open window costs about 12% of a core on the test VM.
+  With the timer, an open window renders about 33 frames per second and costs
+  about 11% of a core on the test VM with the three demo agents, 5% zoomed on
+  one agent and 2% with the animation paused (offscreen preview, October 2026).
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

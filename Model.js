@@ -89,6 +89,11 @@ function fileNodes(agent, x, y, radius) {
     });
 }
 
+// The end of a path, which names the file, survives truncation.
+function shortPath(path, max) {
+    var chars = Array.from(String(path));
+    return chars.length <= max ? chars.join("") : "…" + chars.slice(chars.length - max + 1).join("");
+}
 function baseName(path) {
     var parts = String(path).split("/");
     return parts[parts.length - 1] || path;

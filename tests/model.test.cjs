@@ -23,6 +23,12 @@ test('file nodes keep a minimum angular gap and stable positions', () => {
     assert.ok(Math.min(...gaps) > Math.PI * 2 / 12 * 0.6, `gaps ${gaps}`);
     assert.deepEqual(model.fileNodes({id: 'a', files}, 0, 0, 100).map(n => n.x), nodes.map(n => n.x));
 });
+test('short paths keep their end', () => {
+    assert.equal(model.shortPath('app/models/order.rb', 40), 'app/models/order.rb');
+    assert.equal(model.shortPath('app/models/concerns/order.rb', 12), '…ns/order.rb');
+    assert.equal(Array.from(model.shortPath('a/'.repeat(40) + 'end.rb', 20)).length, 20);
+    assert.ok(model.shortPath('a/'.repeat(40) + 'end.rb', 20).endsWith('/end.rb'));
+});
 test('centres stay inside the unit square', () => {
     for (let count = 1; count <= 24; count++)
         for (const aspect of [0.5, 1, 2.2])
