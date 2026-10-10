@@ -12,6 +12,7 @@ C.Popup {
     property int section: 0
     property bool claude: true
     property bool codex: true
+    property bool notify: true
     onSectionChanged: scroll.contentY = 0
     width: Math.min(560, parent.width - 24)
     height: Math.min(parent.height - 24, 620)
@@ -22,7 +23,7 @@ C.Popup {
     closePolicy: C.Popup.CloseOnEscape | C.Popup.CloseOnPressOutside
     Theme { id: theme }
     onAboutToShow: {
-        claude = service.claudeEnabled; codex = service.codexEnabled;
+        claude = service.claudeEnabled; codex = service.codexEnabled; notify = service.notifyWaiting;
         claudeDir.text = service.claudeDir; codexDir.text = service.codexDir;
         interval.text = String(service.intervalSeconds); idle.text = String(service.idleMinutes);
         validationError = ""; scroll.contentY = 0;
@@ -108,6 +109,16 @@ C.Popup {
                     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Applies while a panel or window is open. With only the bar icon, sessions are checked every 5 seconds so a waiting agent can turn the icon red."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
                     Label { text: "Hide idle sessions after · minutes (1–1440)" }
                     SearchField { id: idle; objectName: "idleField"; Layout.fillWidth: true; Accessible.name: "Minutes before idle sessions are hidden" }
+                    ActionButton {
+                        objectName: "notifyToggle"
+                        Layout.fillWidth: true
+                        Layout.topMargin: 8
+                        text: (root.notify ? "■ " : "□ ") + "Notify when an agent waits"
+                        hint: "Show a desktop notification when an agent starts waiting for input"
+                        selected: root.notify
+                        onClicked: root.notify = !root.notify
+                    }
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "The notification offers Go to terminal. It needs the bar icon, which keeps checking sessions every 5 seconds."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
                 }
                 ColumnLayout {
                     visible: root.section === 2
@@ -132,7 +143,7 @@ C.Popup {
         ActionButton {
             objectName: "applySettings"; Layout.fillWidth: true; text: "Done"
             onClicked: {
-                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim());
+                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify);
                 if (root.validationError === "") root.close();
             }
         }

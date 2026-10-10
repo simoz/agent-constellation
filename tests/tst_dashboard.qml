@@ -43,6 +43,7 @@ Item {
         property string codexDir: ""
         property int intervalSeconds: 1
         property int idleMinutes: 30
+        property bool notifyWaiting: true
         function agent(id, status) {
             return {id: id, kind: id.split(":")[0], name: "demo", project: "demo-" + id, model: "m", status: status, waitingFor: "",
                 activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1), pids: id === "claude:a" ? [4242, 4200] : [],

@@ -70,7 +70,9 @@ Open settings with the gear button:
 - **Sources**: read Claude Code and/or Codex sessions, and their directories
   (defaults: `$CLAUDE_CONFIG_DIR` or `~/.claude`, `$CODEX_HOME` or `~/.codex`).
 - **Collection**: refresh interval, how long idle sessions stay visible, pause
-  and retry.
+  and retry, and a desktop notification when an agent starts waiting for input
+  (on by default), whose **Go to terminal** action focuses that agent's
+  terminal.
 - **About**: what is read and shown.
 
 **Done** saves the changes. Invalid values keep the editor open. **Esc** or

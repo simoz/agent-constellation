@@ -89,6 +89,16 @@ function fileNodes(agent, x, y, radius) {
     });
 }
 
+// Agents waiting now that were not waiting in the previous snapshot. The first
+// snapshot (previous === null) reports none, so a restart does not replay alerts.
+function newlyWaiting(previous, agents) {
+    if (previous === null) return [];
+    return agents.filter(function(a) { return a.status === "waiting" && previous.indexOf(a.id) < 0; });
+}
+function waitingIds(agents) {
+    return agents.filter(function(a) { return a.status === "waiting"; }).map(function(a) { return a.id; });
+}
+
 // The end of a path, which names the file, survives truncation.
 function shortPath(path, max) {
     var chars = Array.from(String(path));

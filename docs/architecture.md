@@ -88,9 +88,13 @@ nothing and makes no network requests. Snapshots stay in memory.
 - Per-instance state: bar icon per monitor. Process-wide state: snapshot,
   selection, color roles, animation and pause in `Service.qml`.
 - Durable state: inline plugin configuration in `shell.json` (sources, session
-  directories, interval, idle window), written by Settings → Done.
-- External commands: `python3` running `tools/collect.py`. No credentials, no
-  network endpoints, no privileged operations, no changes to agent settings.
+  directories, interval, idle window, waiting notifications), written by
+  Settings → Done.
+- External commands: `python3` running `tools/collect.py`; `hyprctl clients -j`
+  and `hyprctl dispatch hl.dsp.focus(...)` to go to an agent's terminal;
+  `notify-send` with one action when an agent starts waiting. All run with
+  argument lists. No credentials, no network endpoints, no privileged
+  operations, no changes to agent settings.
 - Failure states: collector unavailable (no Python), invalid output, timeouts
   with bounded retries, source directory missing, source disabled.
 - Removal: `omarchy plugin remove` deletes the plugin and its configuration;
@@ -100,8 +104,7 @@ nothing and makes no network requests. Snapshots stay in memory.
 - Prior art (October 2026): `omarchy.agents` shows usage and limits; "Agent
   Sessions" lists live session status; "Agent Activity Visualization" charts
   history. None draws live tool activity per file.
-- Deferred: Hyprland background-layer mode, desktop notifications for waiting
-  agents, Codex approval detection, and the other agents Omarchy offers (pi,
+- Deferred: Hyprland background-layer mode, Codex approval detection, and the other agents Omarchy offers (pi,
   omp, opencode, crush, grok, gemini, openclaw, hermes, copilot, cursor-agent,
   muse). Each needs real sessions to verify its format, so it waits until one
   is in use; presence from running processes (project from the working

@@ -23,6 +23,12 @@ test('file nodes keep a minimum angular gap and stable positions', () => {
     assert.ok(Math.min(...gaps) > Math.PI * 2 / 12 * 0.6, `gaps ${gaps}`);
     assert.deepEqual(model.fileNodes({id: 'a', files}, 0, 0, 100).map(n => n.x), nodes.map(n => n.x));
 });
+test('only agents that start waiting raise an alert', () => {
+    const agents = [{id: 'a', status: 'waiting'}, {id: 'b', status: 'waiting'}, {id: 'c', status: 'working'}];
+    assert.equal(model.newlyWaiting(null, agents).length, 0);
+    assert.deepEqual(Array.from(model.newlyWaiting(['a'], agents), a => a.id), ['b']);
+    assert.deepEqual(Array.from(model.waitingIds(agents)), ['a', 'b']);
+});
 test('short paths keep their end', () => {
     assert.equal(model.shortPath('app/models/order.rb', 40), 'app/models/order.rb');
     assert.equal(model.shortPath('app/models/concerns/order.rb', 12), '…ns/order.rb');

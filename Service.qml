@@ -16,6 +16,7 @@ Item {
     property string codexDir: ""
     property int intervalSeconds: 1
     property int idleMinutes: 30
+    property bool notifyWaiting: true
     property var savedConfiguration: ({})
     property var snapshot: null
     property string phase: "idle"
@@ -57,13 +58,13 @@ Item {
     }
     function removeView(token) { views = views.filter(function(v) { return v.token !== token; }); }
 
-    function configure(claude, codex, claudePath, codexPath, interval, idle) {
+    function configure(claude, codex, claudePath, codexPath, interval, idle, notify) {
         var seconds = Number(interval), minutes = Number(idle);
         if (!validPath(claudePath) || !validPath(codexPath) || /[\x00-\x1f]/.test(claudePath + codexPath)) return "Use absolute directory paths.";
         if (!validInterval(seconds)) return "Refresh interval must be 1–10 seconds.";
         if (!validIdle(minutes)) return "Idle sessions must be hidden after 1–1440 minutes.";
         var config = Object.assign({}, savedConfiguration, {sources: {claude: claude, codex: codex}, claudeDir: claudePath,
-            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes});
+            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false});
         // updateEntryInline returns whether shell.json changed, not whether saving
         // failed: an entry that is already up to date also returns false.
         if (shell) shell.updateEntryInline("io.github.simoz.agent-constellation", config);
@@ -80,6 +81,7 @@ Item {
         codexDir = typeof config.codexDir === "string" && validPath(config.codexDir) ? config.codexDir : "";
         intervalSeconds = validInterval(config.intervalSeconds) ? config.intervalSeconds : 1;
         idleMinutes = validIdle(config.idleMinutes) ? config.idleMinutes : 30;
+        notifyWaiting = config.notifyWaiting !== false;
     }
     // Empty paths select the defaults (CLAUDE_CONFIG_DIR / CODEX_HOME, then ~/.claude and ~/.codex).
     function validPath(path) { return !path || (path[0] === "/" && path.length <= 4096); }
@@ -143,5 +145,36 @@ Item {
         stdout: StdioCollector { onStreamFinished: root.focusWindow(text) }
     }
     Process { id: windowFocus }
+
+    // A desktop notification when an agent starts waiting for input. notify-send
+    // waits for the reply, so each notification owns its process until closed.
+    property var waitingSeen: null
+    property int openNotifications: 0
+    onSnapshotChanged: {
+        if (!snapshot) return;
+        if (notifyWaiting) Model.newlyWaiting(waitingSeen, agents).forEach(notifyWaitingAgent);
+        waitingSeen = Model.waitingIds(agents);
+    }
+    function notifyWaitingAgent(agent) {
+        if (openNotifications >= 4) return;
+        var id = agent.id;
+        notification.createObject(root, {command: ["notify-send", "--app-name=Agent Constellation",
+            "--action=focus=Go to terminal", Model.agentTitle(agent) + " is waiting",
+            "Waiting for " + (agent.waitingFor || "input") + "."], agentId: id});
+    }
+    Component {
+        id: notification
+        Process {
+            id: alert
+            property string agentId: ""
+            running: true
+            Component.onCompleted: root.openNotifications++
+            Component.onDestruction: root.openNotifications--
+            stdout: StdioCollector {
+                onStreamFinished: if (text.trim() === "focus") root.focusAgent(root.agentById(alert.agentId))
+            }
+            onExited: destroy()
+        }
+    }
     Timer { id: noticeTimer; interval: 4000; onTriggered: root.notice = "" }
 }
