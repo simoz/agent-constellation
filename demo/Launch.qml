@@ -72,14 +72,14 @@ ShellRoot {
         {t: 19.2, click: false, run: function() { service.selection = ""; }}
     ]
     readonly property var words: [
-        {from: 2.4, to: 4.8, lines: [[2.4, "EVERY AGENT."], [3.0, "LIVE."]]},
-        {from: 4.8, to: 7.2, lines: [[4.8, "EVERY"], [5.4, "TOOL CALL."]]},
-        {from: 7.2, to: 9.6, lines: [[7.2, "EVERY FILE"], [7.8, "HEATS UP."]]},
+        {from: 2.4, to: 4.8, lines: [[2.4, "YOUR AGENTS."], [3.0, "LIVE."]]},
+        {from: 4.8, to: 7.2, lines: [[4.8, "TOOL CALLS"], [5.4, "IN FLIGHT."]]},
+        {from: 7.2, to: 9.6, lines: [[7.2, "HOT FILES"], [7.8, "GLOW."]]},
         {from: 9.6, to: 12.0, lines: [[9.6, "SUBAGENTS"], [10.2, "IN ORBIT."]]},
         {from: 12.0, to: 14.4, lines: [[12.0, "WAITING"], [12.6, "FOR YOU."]]},
         {from: 14.4, to: 15.6, small: true, lines: [[14.4, "JUMP TO ITS TERMINAL"]]},
         {from: 15.6, to: 16.8, small: true, lines: [[15.6, "ZOOM IN"]]},
-        {from: 16.8, to: 19.2, small: true, lines: [[16.8, "EVERY PATH."], [18.0, "EVERY LINE."]]},
+        {from: 16.8, to: 19.2, small: true, lines: [[16.8, "PATHS."], [18.0, "LINE COUNTS."]]},
         {from: 19.2, to: 21.6, small: true, lines: [[19.2, "TOKENS"], [19.8, "IN WAVES."]]},
         {from: 21.6, to: 24.0, small: true, lines: [[21.6, "CLAUDE CODE."], [22.2, "CODEX."], [22.8, "LOCAL."], [23.4, "READ-ONLY."]]}
     ]
