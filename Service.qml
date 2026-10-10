@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell.Io
 import "Model.js" as Model
 import "ui" as Constellation
 
@@ -105,4 +106,38 @@ Item {
     function agentById(id) { return agents.filter(function(a) { return a.id === id; })[0] || null; }
     function select(id) { selection = selection === id ? "" : id; }
     onSelectedChanged: if (selection && !selected) selection = ""
+
+    // Going to an agent's terminal: the nearest ancestor of the agent process that
+    // owns a Hyprland window. Terminals that serve several windows from one
+    // process (a server mode) match their first window.
+    property string notice: ""
+    property var focusPids: []
+    function canFocus(agent) { return !!agent && agent.pids.length > 0; }
+    function focusAgent(agent) {
+        if (!agent) { showNotice("Select an agent first"); return; }
+        if (!canFocus(agent)) { showNotice("No terminal known for " + Model.agentTitle(agent)); return; }
+        if (windowList.running) return;
+        focusPids = agent.pids;
+        windowList.running = true;
+    }
+    function showNotice(text) { notice = text; noticeTimer.restart(); }
+    function focusWindow(output) {
+        var clients = [];
+        try { clients = JSON.parse(output); } catch (e) {}
+        var best = null, rank = focusPids.length;
+        (Array.isArray(clients) ? clients : []).forEach(function(c) {
+            var index = c && typeof c.address === "string" && /^0x[0-9a-f]+$/.test(c.address) ? focusPids.indexOf(c.pid) : -1;
+            if (index >= 0 && index < rank) { best = c; rank = index; }
+        });
+        if (!best) { showNotice("Terminal window not found"); return; }
+        windowFocus.command = ["hyprctl", "dispatch", "hl.dsp.focus({ window = \"address:" + best.address + "\" })"];
+        windowFocus.running = true;
+    }
+    Process {
+        id: windowList
+        command: ["hyprctl", "clients", "-j"]
+        stdout: StdioCollector { onStreamFinished: root.focusWindow(text) }
+    }
+    Process { id: windowFocus }
+    Timer { id: noticeTimer; interval: 4000; onTriggered: root.notice = "" }
 }

@@ -29,6 +29,7 @@ function agent(a) {
     check(text(a.name, 60) && text(a.project, 60) && text(a.model, 60) && statuses.indexOf(a.status) >= 0 && text(a.waitingFor, 60));
     check(activity(a.activity) && integer(a.toolCalls) && integer(a.outputTokens) && integer(a.tokensPerMinute));
     check(list(a.activityBuckets, 30) && a.activityBuckets.length === 30 && a.activityBuckets.every(integer));
+    check(list(a.pids, 16) && a.pids.every(function(p) { return integer(p) && p > 1; }));
     check(list(a.subagents, 6) && a.subagents.every(function(s) { return object(s) && text(s.id, 200) && text(s.name, 40) && text(s.type, 40); }));
     check(list(a.files, 16) && a.files.every(function(f) {
         return object(f) && text(f.path, 160) && integer(f.touches) && integer(f.edits) && integer(f.added) && integer(f.removed)

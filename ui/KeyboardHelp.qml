@@ -60,6 +60,7 @@ C.Popup {
                         [[settingsIcon, "Ctrl+,"], "Open Sources, Collection and About settings"],
                         [["▷", "Ⅱ", "Ctrl+G"], "Pause or resume the animation"],
                         [["↺", "Ctrl+Shift+R"], "Show all agents again"],
+                        [["↗", "Ctrl+T"], "Go to the terminal of the focused agent card or the selected agent"],
                         [[], "CONSTELLATION · WHEN FOCUSED"],
                         [["←", "↑", "→", "↓"], "Select the previous / next agent"],
                         [["Home"], "Show all agents again"],

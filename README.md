@@ -89,6 +89,12 @@ has focus, editing keys take priority.
 | Ctrl+, | Open Settings |
 | Ctrl+G | Pause / resume the animation |
 | Ctrl+Shift+R | Show all agents again |
+| Ctrl+T | Go to the terminal of the focused agent card, or of the selected agent |
+
+With the mouse, double-click an agent card, or select an agent and use **↗**.
+The terminal is found among the windows of the agent's parent processes. A
+terminal that serves several windows from one process focuses its first
+window.
 
 The keyboard button or **F1** opens the KEYS guide. F1 is inactive while
 Settings is open.
@@ -118,7 +124,7 @@ stored, and nothing is sent over the network.
 
 **Waiting** comes from Claude Code's own session records. Codex does not record
 approval prompts in its session files, so Codex agents show working, thinking
-or idle only. Codex sessions are shown only while a Codex process runs, and
+or idle only. Codex sessions are shown only while Codex keeps them open, and
 Codex subagents such as the approval guardian appear under their parent
 session. **Thinking** means the agent is busy without a tool call in the last
 20 seconds. Heat is relative to each agent's hottest file and fades with a

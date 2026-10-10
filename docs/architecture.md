@@ -45,8 +45,11 @@ The UI requests snapshots over the collector's stdin
    (`<session>/subagents/agent-*.jsonl`);
 3. reads Codex rollouts from today's and yesterday's
    `~/.codex/sessions/YYYY/MM/DD/` folders that changed within the idle window,
-   only while a `codex` process of the user runs: rollouts carry no process id
-   and an interrupted turn never records its completion. A rollout whose
+   only while their thread is open: Codex holds a `flock` on
+   `thread-writer-locks/<thread id>.lock` for each open thread, and the file
+   outlives it. The lock holder (listed in `/proc/locks`) is the process whose
+   ancestors lead to the terminal. Rollouts themselves carry no process id, and
+   an interrupted turn never records its completion. A rollout whose
    `session_meta` names a `parent_thread_id` (a subagent such as the approval
    guardian) is shown as a subagent of its parent, not as an agent;
 4. replies with per-agent status, current activity, file heat, subagents,
@@ -64,7 +67,7 @@ before the snapshot replaces the previous one.
 | working | session record `busy`, a tool call in the last 20 s | `task_started` without a later completion |
 | thinking | session record `busy`, no recent tool call | `task_started`, no tool call in the last 20 s |
 | waiting | session record `waiting` (permission, input) | not recorded by Codex |
-| idle | session record `idle`; hidden after the idle window | after `task_complete` / `turn_aborted`, or 10 min without changes; hidden when no Codex process runs |
+| idle | session record `idle`; hidden after the idle window | after `task_complete` / `turn_aborted`, or 10 min without changes; hidden when its thread lock is not held |
 
 ## Privacy
 

@@ -42,7 +42,7 @@ Item {
         property int idleMinutes: 30
         function agent(id, status) {
             return {id: id, kind: id.split(":")[0], name: "demo", project: "demo-" + id, model: "m", status: status, waitingFor: "",
-                activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1),
+                activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1), pids: id === "claude:a" ? [4242, 4200] : [],
                 subagents: [], files: [{path: "a.rb", touches: 1, edits: 1, added: 1, removed: 0, heat: 1, lastMs: 0, subagent: ""}]};
         }
         function agentColor(a) { return themeColors.role(Model.agentRole(a, {})); }
@@ -51,6 +51,10 @@ Item {
         function refresh() { refreshes++; }
         function retry() {}
         function configure() { return ""; }
+        property string notice: ""
+        property var focused: []
+        function canFocus(a) { return !!a && a.pids.length > 0; }
+        function focusAgent(a) { focused = focused.concat([a ? a.id : null]); }
     }
     Constellation.Dashboard {
         id: dashboard
@@ -64,7 +68,7 @@ Item {
         name: "Dashboard"
         when: windowShown
         function init() {
-            service.paused = false; service.animating = true; service.selection = ""; service.refreshes = 0;
+            service.paused = false; service.animating = true; service.selection = ""; service.refreshes = 0; service.focused = [];
             closeSpy.clear(); expandSpy.clear();
             dashboard.scene.forceActiveFocus();
         }
@@ -100,6 +104,22 @@ Item {
             compare(service.selection, "codex:b");
             keyClick(Qt.Key_Space);
             compare(service.selection, "");
+        }
+        function test_terminal_goes_to_focused_card_or_selection() {
+            var button = findChild(dashboard, "terminalButton");
+            verify(!button.enabled);
+            keyClick(Qt.Key_T, Qt.ControlModifier);
+            compare(service.focused, [null]);
+            service.selection = "claude:a";
+            verify(button.enabled);
+            mouseClick(button);
+            var list = dashboard.agentList.list;
+            list.currentIndex = 1;
+            list.currentItem.forceActiveFocus();
+            keyClick(Qt.Key_T, Qt.ControlModifier);
+            compare(service.focused, [null, "claude:a", "codex:b"]);
+            service.selection = "codex:b";
+            verify(!button.enabled);
         }
         function test_help_and_escape() {
             var help = findChild(dashboard, "constellationKeyboardHelp");

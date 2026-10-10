@@ -17,6 +17,11 @@ FocusScope {
     readonly property bool wide: width >= 800
     signal expandRequested()
     signal closeRequested()
+    // The focused agent card, otherwise the selected agent.
+    function terminalTarget() {
+        var card = agents.list.currentItem;
+        return card && card.activeFocus ? card.modelData : root.service.selected;
+    }
     Theme { id: theme }
     Shortcut {
         sequence: "F1"
@@ -36,6 +41,7 @@ FocusScope {
             if (event.key === Qt.Key_R && refreshButton.enabled) refreshButton.clicked();
             else if (event.key === Qt.Key_P) collectionToggle.clicked();
             else if (event.key === Qt.Key_G) motionButton.clicked();
+            else if (event.key === Qt.Key_T) root.service.focusAgent(root.terminalTarget());
             else if (event.key === Qt.Key_E && root.surfaceSwitchAvailable) surfaceSwitch.clicked();
             else if (event.key === Qt.Key_Comma) settingsButton.clicked();
             else return;
@@ -157,6 +163,16 @@ FocusScope {
                         anchors { right: parent.right; bottom: parent.bottom; margins: 12 }
                         spacing: 4
                         ActionButton {
+                            id: terminalButton
+                            objectName: "terminalButton"
+                            text: "↗"; implicitWidth: 28; implicitHeight: 26
+                            enabled: root.service.canFocus(root.service.selected)
+                            hint: "Go to the selected agent's terminal (Ctrl+T)"
+                            C.ToolTip.visible: hovered
+                            C.ToolTip.text: hint
+                            onClicked: root.service.focusAgent(root.service.selected)
+                        }
+                        ActionButton {
                             id: clearSelectionButton
                             objectName: "clearSelectionButton"
                             text: "↺"; implicitWidth: 28; implicitHeight: 26
@@ -199,7 +215,7 @@ FocusScope {
                 columns: root.wide ? 2 : 1
                 Label {
                     Layout.fillWidth: true
-                    text: (root.service.error || root.service.sourceStatus) + (root.service.snapshot ? " · " + Model.clock(root.service.snapshot.observedAtMs) : "")
+                    text: root.service.notice ? root.service.notice : (root.service.error || root.service.sourceStatus) + (root.service.snapshot ? " · " + Model.clock(root.service.snapshot.observedAtMs) : "")
                     color: theme.subdued
                     font.pixelSize: theme.size * 0.7
                 }

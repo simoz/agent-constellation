@@ -1,5 +1,6 @@
 """Collector tests with synthetic Claude Code and Codex session files."""
 
+import fcntl
 import io
 import json
 import os
@@ -40,13 +41,23 @@ class CollectorTest(unittest.TestCase):
         self.transcripts = self.claude / "projects" / "-home-tester-work-demo"
         self.transcripts.mkdir(parents=True)
 
+        self.locks = []
+
     def tearDown(self):
+        for handle in self.locks:
+            handle.close()
         self.temp.cleanup()
 
-    def collector(self, sources=("claude", "codex"), idle=30, codex_alive=True):
-        collector = collect.Collector(self.claude, self.codex, set(sources), idle)
-        collector.codex_alive = lambda: codex_alive
-        return collector
+    def collector(self, sources=("claude", "codex"), idle=30):
+        return collect.Collector(self.claude, self.codex, set(sources), idle)
+
+    def hold(self, thread):
+        """Hold a Codex thread writer lock, as a running Codex does."""
+        folder = self.codex / "thread-writer-locks"
+        folder.mkdir(parents=True, exist_ok=True)
+        handle = (folder / f"{thread}.lock").open("w")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        self.locks.append(handle)
 
     def session(self, session_id="s1", status="busy", pid=None, start=None, **extra):
         pid = pid or os.getpid()
@@ -79,6 +90,7 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual((agent["files"][0]["edits"], agent["files"][0]["added"], agent["files"][0]["removed"]), (2, 3, 2))
         self.assertEqual(agent["activity"]["tool"], "Bash")
         self.assertEqual(agent["activity"]["target"], "bundle")
+        self.assertEqual(agent["pids"][:2], [os.getpid(), os.getppid()])
         payload = json.dumps(snapshot)
         for private in ("secret prompt", "hunter2", "rspec"):
             self.assertNotIn(private, payload)
@@ -126,7 +138,7 @@ class CollectorTest(unittest.TestCase):
         day = self.codex / "sessions" / time.strftime("%Y/%m/%d")
         rollout = day / "rollout-2026-10-10T10-00-00-abc.jsonl"
         self.append(rollout,
-                    {"timestamp": iso(), "type": "session_meta", "payload": {"cwd": PROJECT}},
+                    {"timestamp": iso(), "type": "session_meta", "payload": {"id": "t1", "cwd": PROJECT}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "thread_settings_applied", "thread_settings": {"model": "gpt-5-codex"}}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {
@@ -135,6 +147,7 @@ class CollectorTest(unittest.TestCase):
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {
                         "type": "FileChange", "changes": {PROJECT + "/app/x.rb": {"unified_diff": "@@\n-a\n+b\n+c\n"}}}}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"output_tokens": 42}}}})
+        self.hold("t1")
         agent = self.collector(("codex",)).snapshot("r")["agents"][0]
         self.assertEqual((agent["kind"], agent["project"], agent["model"], agent["status"]), ("codex", "demo", "gpt-5-codex", "working"))
         self.assertEqual(agent["files"][0], {**agent["files"][0], "path": "app/x.rb", "touches": 2, "edits": 1, "added": 2, "removed": 1})
@@ -153,7 +166,9 @@ class CollectorTest(unittest.TestCase):
             handle.write("[" * 100_000 + "]" * 100_000 + "\n")
         self.append(transcript, tool("Read", {"file_path": PROJECT + "/b.rb"}, "m3"))
         rollout = self.codex / "sessions" / time.strftime("%Y/%m/%d") / "rollout-x.jsonl"
+        self.hold("x1")
         self.append(rollout,
+                    {"timestamp": iso(), "type": "session_meta", "payload": {"id": "x1"}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {"type": "CommandExecution", "parsed_cmd": 3}}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
         snapshot = self.collector().snapshot("r")
@@ -204,13 +219,18 @@ class CollectorTest(unittest.TestCase):
             handle.write('{"type": "fragment"}\n{"type": "ok"}\n')
         self.assertEqual(tail.read(), [{"type": "ok"}])
 
-    def test_codex_rollouts_need_a_running_codex(self):
-        # A rollout interrupted mid-task keeps its last task_started after Codex exits.
+    def test_codex_threads_need_their_writer_lock(self):
+        # Rollouts outlive Codex, and an interrupted turn never records its completion.
         self.append(self.codex / "sessions" / time.strftime("%Y/%m/%d") / "rollout-a.jsonl",
+                    {"timestamp": iso(), "type": "session_meta", "payload": {"id": "t1"}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
-        self.assertEqual(len(self.collector(("codex",)).snapshot("r")["agents"]), 1)
-        snapshot = self.collector(("codex",), codex_alive=False).snapshot("r")
+        (self.codex / "thread-writer-locks").mkdir(parents=True)
+        (self.codex / "thread-writer-locks" / "t1.lock").touch()
+        snapshot = self.collector(("codex",)).snapshot("r")
         self.assertEqual((snapshot["agents"], snapshot["sources"]["codex"]), ([], "ok"))
+        self.hold("t1")
+        agent = self.collector(("codex",)).snapshot("r")["agents"][0]
+        self.assertEqual(agent["pids"][:2], [os.getpid(), os.getppid()])
 
     def test_codex_subagent_rollout_belongs_to_parent(self):
         day = self.codex / "sessions" / time.strftime("%Y/%m/%d")
@@ -224,6 +244,7 @@ class CollectorTest(unittest.TestCase):
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {
                         "type": "CommandExecution", "command": ["/bin/bash", "-lc", "git diff"], "parsed_cmd": []}}},
                     {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_complete"}})
+        self.hold("p1")
         snapshot = self.collector(("codex",)).snapshot("r")
         self.assertEqual([a["id"] for a in snapshot["agents"]], ["codex:t1-parent"])
         agent = snapshot["agents"][0]

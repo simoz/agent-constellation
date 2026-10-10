@@ -51,6 +51,7 @@ Item {
             focusPolicy: Qt.StrongFocus
             Accessible.name: Model.agentTitle(modelData) + ", " + Model.statusLabel(modelData.status) + ", " + Model.activityText(modelData.activity)
             onClicked: root.service.select(modelData.id)
+            onDoubleClicked: root.service.focusAgent(modelData)
             onActiveFocusChanged: if (activeFocus) {
                 list.currentIndex = index;
                 list.positionViewAtIndex(index, ListView.Contain);

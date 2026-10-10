@@ -30,6 +30,7 @@ MAX_AGENTS = 24
 MAX_FILES = 16
 MAX_SUBAGENTS = 6
 MAX_EVENTS = 40
+MAX_PIDS = 16
 MAX_TEXT = 160
 # A newly discovered transcript is read from its last 1 MiB; later reads take at
 # most 4 MiB per file per snapshot so one huge append cannot stall a reply.
@@ -90,21 +91,20 @@ def search_target(pattern) -> str:
     return clip(text, 48)
 
 
-def codex_running() -> bool:
-    """Whether the user runs any Codex process; rollouts outlive the sessions that wrote them."""
-    uid = os.getuid()
-    for entry in os.scandir("/proc"):
-        if not entry.name.isdigit():
-            continue
+def ancestry(pid: int) -> list[int]:
+    """The process and its ancestors owned by the user, nearest first: the UI finds the terminal window among them."""
+    chain, uid = [], os.getuid()
+    while pid > 1 and len(chain) < MAX_PIDS:
         try:
-            if entry.stat().st_uid != uid:
-                continue
-            with open(f"/proc/{entry.name}/comm", "rb") as handle:
-                if handle.read().strip() == b"codex":
-                    return True
-        except OSError:
-            continue
-    return False
+            if os.stat(f"/proc/{pid}").st_uid != uid:
+                break
+            with open(f"/proc/{pid}/stat", "rb") as handle:
+                parent = int(handle.read().rsplit(b")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+        chain.append(pid)
+        pid = parent
+    return chain
 
 
 def read_json(path: Path):
@@ -227,6 +227,7 @@ class Agent:
         self.subagents: dict[str, dict] = {}
         self.seen_messages: deque = deque(maxlen=256)
         self.tails: dict[Path, Tail] = {}
+        self.pids: list[int] = []
 
     def tail(self, path: Path) -> Tail:
         if path not in self.tails:
@@ -292,6 +293,7 @@ class Agent:
             "outputTokens": self.output_tokens,
             "tokensPerMinute": sum(n for at, n in self.token_samples if at_ms - at <= TOKEN_WINDOW * 1000),
             "activityBuckets": buckets,
+            "pids": self.pids,
             "subagents": [
                 {"id": clip(key, 200), "name": clip(sub["name"], 40), "type": clip(sub["type"], 40)}
                 for key, sub in sorted(self.subagents.items(), key=lambda item: item[1]["startedMs"])
@@ -319,7 +321,6 @@ class Collector:
         self.sequence = 0
         self.skipped = 0
         self.codex_metas: dict[Path, dict] = {}
-        self.codex_alive = codex_running
 
     def safely(self, handler, *args) -> None:
         """Run one record or entry handler; input of an unexpected shape is skipped, not fatal."""
@@ -370,6 +371,7 @@ class Collector:
         seen.add(ident)
         agent.status = status
         agent.waiting_for = str(record.get("waitingFor") or "")
+        agent.pids = ancestry(int(record.get("pid")))
         transcripts = list(self.claude_dir.glob("projects/*/" + session_id + ".jsonl"))
         if transcripts:
             for entry in agent.tail(transcripts[0]).read():
@@ -458,8 +460,7 @@ class Collector:
         root = self.codex_dir / "sessions"
         if not root.is_dir():
             return "missing"
-        if not self.codex_alive():
-            return "ok"
+        holders = self.codex_holders()
         threads: dict[str, Agent] = {}
         children = []
         days = {time.strftime("%Y/%m/%d", time.localtime(at_ms / 1000 - offset)) for offset in (0, 86400)}
@@ -481,10 +482,13 @@ class Collector:
                     # Subagents such as the approval guardian belong to their parent thread.
                     children.append((path, stem, modified, meta))
                     continue
+                holder = holders.get(meta.get("thread", ""))
+                if holder is None:
+                    continue
                 agent = self.agents.get(ident) or Agent(ident, "codex", "")
                 self.agents[ident] = agent
-                if meta.get("thread"):
-                    threads[meta["thread"]] = agent
+                agent.pids = ancestry(holder)
+                threads[meta["thread"]] = agent
                 for entry in agent.tail(path).read():
                     self.safely(self.codex_entry, agent, entry)
                 working_stale = agent.status == "working" and at_ms - modified > CODEX_STALE_WORKING * 1000
@@ -500,6 +504,35 @@ class Collector:
         if len(self.codex_metas) > 512:
             self.codex_metas.clear()
         return "ok"
+
+    def codex_holders(self) -> dict[str, int]:
+        """Live Codex threads: Codex holds a flock on thread-writer-locks/<thread id>.lock
+        while a thread is open, and the file outlives it. Maps thread id to the holding pid."""
+        try:
+            entries = list(os.scandir(self.codex_dir / "thread-writer-locks"))
+        except OSError:
+            return {}
+        threads = {}
+        for entry in entries:
+            if entry.name.endswith(".lock") and not entry.name.startswith("."):
+                try:
+                    info = entry.stat()
+                except OSError:
+                    continue
+                key = f"{os.major(info.st_dev):02x}:{os.minor(info.st_dev):02x}:{info.st_ino}"
+                threads[key] = entry.name.removesuffix(".lock")
+        holders = {}
+        if threads:
+            try:
+                with open("/proc/locks") as handle:
+                    for line in handle:
+                        # "1: FLOCK ADVISORY WRITE <pid> <maj>:<min>:<inode> 0 EOF"; waiters have "->".
+                        fields = line.split()
+                        if len(fields) >= 6 and fields[1] == "FLOCK" and fields[5] in threads:
+                            holders[threads[fields[5]]] = int(fields[4])
+            except (OSError, ValueError):
+                return {}
+        return holders
 
     def codex_meta(self, path: Path) -> dict:
         """Thread id, parent thread id and subagent name from the rollout's first line."""

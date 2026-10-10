@@ -9,7 +9,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '../Protocol.js'), 'utf8'),
 function agent(id) {
     return {id, kind: 'claude', name: 'demo', project: 'demo', model: 'opus-5-5', status: 'working', waitingFor: '',
         activity: {tool: 'Edit', target: 'app/a.rb', atMs: 1800000000000, subagent: ''}, toolCalls: 3, outputTokens: 120,
-        tokensPerMinute: 40, activityBuckets: Array(30).fill(0), subagents: [{id: 'agent-1', name: 'Explore', type: 'Explore'}],
+        tokensPerMinute: 40, activityBuckets: Array(30).fill(0), pids: [4242, 4200], subagents: [{id: 'agent-1', name: 'Explore', type: 'Explore'}],
         files: [{path: 'app/a.rb', touches: 2, edits: 1, added: 3, removed: 1, heat: 1, lastMs: 1800000000000, subagent: ''}]};
 }
 function snapshot() {
@@ -24,7 +24,7 @@ test('rejects bad schema, late replies and repeated sequences', () => {
     const changes = [s => s.version = 2, s => s.requestId = 'late', s => s.agents[0].status = 'busy',
         s => s.agents[0].activityBuckets.pop(), s => s.agents[0].files[0].heat = 2, s => s.agents[0].name = 'bad\nname',
         s => s.events[0].agent = 'unknown', s => s.agents.push(s.agents[0]), s => s.sources.codex = 'maybe',
-        s => s.error = 'boom', s => s.session = 'short'];
+        s => s.error = 'boom', s => s.session = 'short', s => s.agents[0].pids = [1], s => s.agents[0].pids = Array(17).fill(9)];
     for (const change of changes) {
         const s = snapshot(); change(s);
         assert.throws(() => protocol.parse(JSON.stringify(s), 'r-1', '', 0), String(change));
