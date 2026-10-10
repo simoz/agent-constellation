@@ -1,0 +1,3 @@
+# symlink to the active Omarchy theme, created by bin/constellation-serve
+web/theme
+.DS_Store

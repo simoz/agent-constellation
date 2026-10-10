@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Serve the constellation locally and keep it in sync with the active Omarchy theme.
+set -euo pipefail
+
+PORT="${1:-7777}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../web" && pwd)"
+THEME_DIR="${OMARCHY_THEME_DIR:-$HOME/.config/omarchy/current/theme}"
+
+# omarchy-theme-set swaps the current/theme symlink, so the page picks up new colors on its own.
+ln -sfn "$THEME_DIR" "$ROOT/theme"
+[ -f "$ROOT/theme/alacritty.toml" ] || echo "note: $THEME_DIR/alacritty.toml not found, using the built-in Tokyo Night palette"
+
+echo "agent-constellation → http://localhost:$PORT"
+cd "$ROOT" && exec python3 -m http.server "$PORT" --bind 127.0.0.1
