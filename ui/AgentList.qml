@@ -47,7 +47,10 @@ Item {
             readonly property bool selected: root.service.selection === modelData.id
             readonly property color ink: root.service.agentColor(modelData)
             width: list.width - 8
-            height: root.rowHeight
+            // A project name on two lines makes the card taller instead of hiding it.
+            height: root.rowHeight + name.implicitHeight - name.implicitHeight / Math.max(1, name.lineCount)
+            C.ToolTip.visible: hovered && name.truncated
+            C.ToolTip.text: modelData.project
             focusPolicy: Qt.StrongFocus
             Accessible.name: Model.agentTitle(modelData) + ", " + Model.statusLabel(modelData.status) + ", " + Model.activityText(modelData.activity)
             onClicked: root.service.select(modelData.id)
@@ -80,8 +83,10 @@ Item {
                     Label {
                         id: name
                         width: parent.width - pill.width - 8
-                        text: card.modelData.kind + " · " + card.modelData.project
+                        text: card.modelData.project
                         font.bold: true
+                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                        maximumLineCount: 2
                     }
                     Rectangle {
                         id: pill
@@ -109,7 +114,7 @@ Item {
                 }
                 Label {
                     width: parent.width - 6
-                    text: [card.modelData.model, Model.tokens(card.modelData.outputTokens) + " tok", card.modelData.toolCalls + " calls"]
+                    text: [card.modelData.kind, card.modelData.model, Model.tokens(card.modelData.outputTokens) + " tok", card.modelData.toolCalls + " calls"]
                         .concat(card.modelData.subagents.length ? [card.modelData.subagents.length + " sub"] : []).filter(function(t) { return t; }).join(" · ")
                     color: theme.subdued
                     font.pixelSize: theme.size * 0.8
