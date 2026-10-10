@@ -76,6 +76,9 @@ def program_name(command) -> str:
         if not words or words[0] in ("cd", "pushd", "popd", "export", "set"):
             continue
         for word in words:
+            # A command substitution assignment such as out=$(git log) runs its inner program.
+            if "=$(" in word or word.startswith("$("):
+                word = word.split("$(", 1)[1]
             if "=" in word.split("/")[0] and not word.startswith(("/", ".")):
                 continue
             if word in ("sudo", "env", "time", "nice", "exec", "timeout") or word.startswith("-") or word.isdigit():
@@ -177,6 +180,7 @@ class Agent:
             self.token_samples.append((at_ms, count))
 
     def call(self, at_ms: int, tool: str, target: str, events: deque, subagent: str = "") -> None:
+        subagent = clip(subagent, 40)
         self.tool_calls += 1
         self.call_times.append(at_ms)
         if at_ms >= self.last_tool_ms:
@@ -185,6 +189,7 @@ class Agent:
         events.append({"atMs": at_ms, "agent": self.id, "subagent": subagent, "tool": clip(tool, 40), "target": target})
 
     def touch(self, at_ms: int, path: str, edit: bool, added: int = 0, removed: int = 0, subagent: str = "") -> None:
+        subagent = clip(subagent, 40)
         entry = self.files.get(path)
         if entry is None:
             entry = self.files[path] = {"score": 0.0, "touches": 0, "edits": 0, "added": 0, "removed": 0, "lastMs": at_ms, "subagent": subagent}
@@ -228,7 +233,7 @@ class Agent:
             "tokensPerMinute": sum(n for at, n in self.token_samples if at_ms - at <= TOKEN_WINDOW * 1000),
             "activityBuckets": buckets,
             "subagents": [
-                {"id": key, "name": clip(sub["name"], 40), "type": clip(sub["type"], 40)}
+                {"id": clip(key, 200), "name": clip(sub["name"], 40), "type": clip(sub["type"], 40)}
                 for key, sub in sorted(self.subagents.items(), key=lambda item: item[1]["startedMs"])
                 if at_ms - sub["lastMs"] <= SUBAGENT_WINDOW * 1000
             ][:MAX_SUBAGENTS],
@@ -501,7 +506,8 @@ def serve(collector: Collector, stdin, stdout) -> None:
                 reply = {"version": PROTOCOL_VERSION, "requestId": request_id, "error": "unknown command"}
             else:
                 reply = collector.snapshot(request_id)
-        stdout.write(json.dumps(reply, separators=(",", ":"), ensure_ascii=False) + "\n")
+        # ASCII output lets the shell split pipe chunks anywhere without breaking UTF-8.
+        stdout.write(json.dumps(reply, separators=(",", ":")) + "\n")
         stdout.flush()
 
 

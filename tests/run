@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Portable checks: JavaScript, the Python collector and QML units.
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+qmltestrunner="${QMLTESTRUNNER:-/usr/lib/qt6/bin/qmltestrunner}"
+node --test tests/*.test.cjs
+python3 -B -m unittest discover -s tests -p 'test_*.py'
+QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic \
+  "$qmltestrunner" -input tests -import tests/stubs -o -,txt
+git diff --check

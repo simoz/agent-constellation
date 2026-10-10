@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Render README screenshots from fictional sessions (demo/fixtures.py) in an
+# isolated offscreen preview. Never reads real agent sessions or changes the bar.
+# Usage: demo/run OUTPUT_DIR   (writes live.png, wait.png, light.png)
+set -euo pipefail
+repository_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+output="${1:?Usage: demo/run OUTPUT_DIR}"
+mkdir -p "$output"
+work=$(mktemp -d /tmp/constellation-demo.XXXXXX)
+# Fixture sessions are visible only while their process is alive.
+sleep 600 & holder=$!
+trap 'kill "$holder" 2>/dev/null || true; rm -rf "$work"' EXIT
+preview=$(python3 -B "$repository_dir/tools/prepare_preview.py")
+theme_file() {
+  mkdir -p "$work/state/omarchy/current/theme"
+  if [[ "$1" == light ]]; then
+    printf '%s\n' 'mode = "light"' 'accent = "#286983"' 'background = "#faf4ed"' 'foreground = "#575279"' \
+      'red = "#b4637a"' 'yellow = "#ea9d34"' 'green = "#286983"' 'cyan = "#d7827e"' 'blue = "#56949f"' 'magenta = "#907aa9"'
+  else
+    printf '%s\n' 'mode = "dark"' 'accent = "#7aa2f7"' 'background = "#1a1b26"' 'foreground = "#a9b1d6"' \
+      'red = "#f7768e"' 'yellow = "#e0af68"' 'orange = "#ff9e64"' 'green = "#9ece6a"' 'cyan = "#7dcfff"' 'blue = "#7aa2f7"' 'magenta = "#bb9af7"'
+  fi > "$work/state/omarchy/current/theme/colors.toml"
+}
+render() {
+  local scene="$1" name="$2" theme="$3"
+  theme_file "$theme"
+  rm -rf "$work/sessions" && mkdir -p "$work/sessions"
+  python3 -B "$repository_dir/demo/fixtures.py" "$work/sessions" "$holder" --scene "$scene"
+  env XDG_CONFIG_HOME="$work/config" XDG_STATE_HOME="$work/state" TZ=UTC \
+    QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic \
+    CONSTELLATION_CLAUDE_DIR="$work/sessions/claude" CONSTELLATION_CODEX_DIR="$work/sessions/codex" \
+    CONSTELLATION_THEME="$theme" CONSTELLATION_CAPTURE="$output/$name.png" \
+    timeout 60 qs -p "$preview" >/dev/null 2>&1
+  printf '%s\n' "$output/$name.png"
+}
+render live live dark
+render wait wait dark
+render live light light

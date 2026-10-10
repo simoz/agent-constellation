@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.simoz.agent-constellation",
+  "name": "Agent Constellation",
+  "version": "0.1.0",
+  "author": "Simone Merli",
+  "license": "MIT",
+  "description": "Watch Claude Code and Codex agents work: tool calls, files, subagents and who is waiting for you.",
+  "kinds": ["service", "bar-widget"],
+  "entryPoints": {"service": "Service.qml", "barWidget": "BarWidget.qml"},
+  "barWidget": {
+    "displayName": "Agent Constellation",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

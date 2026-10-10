@@ -1,48 +1,130 @@
-# agent-constellation
+# Agent Constellation
 
-A live, theme-aware visualizer for the AI coding agents running on your [Omarchy](https://omarchy.org) desktop.
+Watch your coding agents work.
 
-Every agent is a glowing core. Its subagents orbit around it, each tool call flies out to the file it touches, and the files touched most often heat up. When an agent is waiting for your input, its core turns red and pulses, and the screen edges glow.
+Agent Constellation is an Omarchy plugin that shows the Claude Code and Codex
+sessions running on your machine as a live constellation. Every agent is a
+glowing core. Its subagents orbit around it, each tool call flies out to the
+file it touches, and the files touched most often heat up. When an agent is
+waiting for your input, its core turns red and pulses, and the bar icon turns
+red too.
 
-![agent-constellation, Tokyo Night](docs/screenshots/live.png)
+![Three agents: two Claude Code sessions and one Codex session](docs/screenshots/live.png)
 
-> **Status: prototype.** The visuals are done, but the agent activity is still **simulated**. Wiring it to real Claude Code hooks and Codex session logs is the next step (see [Roadmap](#roadmap)).
+## Features
 
-## Follows your Omarchy theme
+- Bar icon with one dot per agent; red when an agent needs you.
+- Compact panel and expanded window sharing the same view.
+- Agent cards with status, current tool call, model, tokens and a five-minute
+  activity sparkline.
+- Event log of recent tool calls, filtered to the selected agent.
+- Colors from the active Omarchy theme, light and dark; keyboard controls.
 
-The palette is read from `~/.config/omarchy/current/theme/alacritty.toml`, which every Omarchy theme ships. `omarchy-theme-set` swaps that symlink, the page re-reads it every 2 seconds, and the colors change live without a reload. Light themes are supported: additive glow is switched off on light backgrounds.
+| Waiting for input | Light theme |
+| --- | --- |
+| ![An agent waiting for permission, with red edges](docs/screenshots/wait.png) | ![The same scene with a light theme](docs/screenshots/light.png) |
 
-| Tokyo Night | Gruvbox | Kanagawa |
-|---|---|---|
-| ![](docs/screenshots/tokyo-night.png) | ![](docs/screenshots/gruvbox.png) | ![](docs/screenshots/kanagawa.png) |
-| **Nord** | **Everforest** | **Rosé Pine (light)** |
-| ![](docs/screenshots/nord.png) | ![](docs/screenshots/everforest.png) | ![](docs/screenshots/rose-pine.png) |
+Screenshots use the fictional sessions in `demo/fixtures.py`.
 
-When an agent needs you:
+## Requirements
 
-![waiting for input](docs/screenshots/waiting.png)
+- The Omarchy Quattro built-in bar with Quickshell.
+- Python 3.11+ (part of Omarchy).
+- Claude Code and/or Codex running locally.
 
-## Try it
+## Install
 
 ```bash
-git clone https://github.com/simoz/agent-constellation.git
-cd agent-constellation
-bin/constellation-serve        # http://localhost:7777
+omarchy plugin add https://github.com/simoz/agent-constellation.git --enable
 ```
 
-`constellation-serve` symlinks `web/theme` to your active Omarchy theme and serves the page on localhost. If you're not on Omarchy it falls back to Tokyo Night, and you can pick a built-in palette with `?theme=gruvbox|catppuccin|kanagawa|nord|everforest|rose-pine`.
+Nothing else is installed and no agent settings or hooks are changed. See
+[development](docs/development.md#install-the-plugin) to install from a working
+copy.
 
-Other URL options: `?scene=wait` (an agent waiting for input), `?scene=tiles` (as a background behind tiled windows).
+## Uninstall
 
-## Roadmap
+```bash
+omarchy plugin remove io.github.simoz.agent-constellation
+```
 
-- [ ] `constellationd`: collect real events from Claude Code hooks (`SessionStart`, `PreToolUse`, `PostToolUse`, `SubagentStop`, `Notification`, `Stop`) and Codex session logs, and stream them over a local WebSocket
-- [ ] `constellation install-hooks`: add the hooks to `~/.claude/settings.json`
-- [ ] Background mode: a layer-shell surface on Hyprland's background layer, shown only on the workspaces you choose (driven by Hyprland's IPC socket)
-- [ ] Dashboard mode: full screen on a dedicated workspace, toggled with `SUPER+ALT+A`
-- [ ] Waybar module `custom/constellation` and a Mako notification when an agent is waiting for you
-- [ ] Omarchy-style install script
+## Using Agent Constellation
 
-## License
+Left-click the bar icon to toggle the compact panel. Right-click it to open the
+expanded window directly, or bring it into focus if it is already open.
 
-MIT
+While the icon is in the bar, sessions are checked every 5 seconds so a waiting
+agent can turn it red. An open panel or window refreshes at the configured
+interval (1 second by default). Use **LIVE / PAUSED** in the header to pause or
+resume collection; pause survives closing and reopening the view. Use
+**Refresh** (⟳) to collect once; while paused it stays paused.
+
+Click an agent core or card to highlight it and filter the event list; click it
+again, or press **↺**, to show all agents. **Ⅱ / ▷** pauses the animation without
+stopping collection. The arrow button switches between compact panel and
+expanded window, preserving the selection.
+
+Open settings with the gear button:
+
+- **Sources**: read Claude Code and/or Codex sessions, and their directories
+  (defaults: `$CLAUDE_CONFIG_DIR` or `~/.claude`, `$CODEX_HOME` or `~/.codex`).
+- **Collection**: refresh interval, how long idle sessions stay visible, pause
+  and retry.
+- **About**: what is read and shown.
+
+**Done** saves the changes. Invalid values keep the editor open. **Esc** or
+clicking outside closes without saving.
+
+### Keyboard controls
+
+These shortcuts work inside Agent Constellation while Settings and KEYS are
+closed. They do not register desktop bindings or use Super. When a text field
+has focus, editing keys take priority.
+
+| Shortcut | Action |
+| --- | --- |
+| Ctrl+R | Refresh once, preserving manual pause |
+| Ctrl+P | Pause / resume collection |
+| Ctrl+E | Switch compact panel / expanded window |
+| Ctrl+, | Open Settings |
+| Ctrl+G | Pause / resume the animation |
+| Ctrl+Shift+R | Show all agents again |
+
+The keyboard button or **F1** opens the KEYS guide. F1 is inactive while
+Settings is open.
+
+| Focus / context | Keys | Action |
+| --- | --- | --- |
+| Controls | Tab / Shift+Tab | Move to the next / previous control |
+| Button or agent card | Enter / Space | Activate the button, or highlight the agent |
+| Constellation | ← / ↑ / → / ↓ | Select the previous / next agent |
+| Constellation | Home | Show all agents again |
+| Agent list | ↑ / ↓ | Move between cards |
+| Event list | ↑ / ↓ / PgUp / PgDn | Scroll |
+| KEYS guide | ↑ / ↓ / PgUp / PgDn | Scroll the guide |
+| Dashboard / KEYS guide | F1 | Open / close the guide |
+| Settings or guide | Esc | Close that popup |
+| Dashboard | Esc | Close Agent Constellation |
+
+## What the data means
+
+The collector reads, without changing them, Claude Code session records and
+transcripts and Codex rollout files. It shows tool names, file paths relative
+to each project, program names without arguments, token counts and status.
+Prompts, replies, command arguments and tool output are never displayed or
+stored, and nothing is sent over the network.
+
+**Waiting** comes from Claude Code's own session records. Codex does not record
+approval prompts in its session files, so Codex agents show working, thinking
+or idle only. **Thinking** means the agent is busy without a tool call in the
+last 20 seconds. Heat is relative to each agent's hottest file and fades with a
+five-minute half-life. The first time a long session is seen, only the last
+1 MiB of its transcript is read.
+
+## Development and licenses
+
+- [Development and tests](docs/development.md)
+- [Architecture and design record](docs/architecture.md)
+- [Collector protocol](docs/protocol.md)
+
+MIT.
