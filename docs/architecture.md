@@ -49,7 +49,8 @@ The UI requests snapshots over the collector's stdin
    token rate, a five-minute activity histogram and the last 40 tool calls.
 
 A new transcript is read from its last 1 MiB; later reads take at most 4 MiB per
-file per request. `Protocol.js` validates framing, limits, session and sequence
+file per request, and an unterminated line longer than 1 MiB is dropped. Session
+records and subagent metadata must be regular files of at most 64 KiB. `Protocol.js` validates framing, limits, session and sequence
 before the snapshot replaces the previous one.
 
 ## Status
@@ -66,7 +67,7 @@ before the snapshot replaces the previous one.
 Transcripts contain prompts, model output, command lines and tool results. The
 collector emits only tool names, file paths relative to the session directory
 (or `~/…`), program names without arguments, search patterns and hosts (both
-truncated), subagent names, model names, token counts and status. It writes
+truncated; patterns that name or look like credentials are redacted), subagent names, model names, token counts and status. It writes
 nothing and makes no network requests. Snapshots stay in memory.
 
 ## Design record

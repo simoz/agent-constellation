@@ -110,7 +110,9 @@ Settings is open.
 
 The collector reads, without changing them, Claude Code session records and
 transcripts and Codex rollout files. It shows tool names, file paths relative
-to each project, program names without arguments, token counts and status.
+to each project, program names without arguments, search patterns, token
+counts and status. A search pattern that names or looks like a credential (for
+example `password`, `API_KEY` or a long mixed token) is shown as `[redacted]`.
 Prompts, replies, command arguments and tool output are never displayed or
 stored, and nothing is sent over the network.
 

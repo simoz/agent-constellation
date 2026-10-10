@@ -17,6 +17,7 @@ import math
 import os
 import re
 import secrets
+import stat
 import sys
 import time
 from collections import deque
@@ -34,6 +35,10 @@ MAX_TEXT = 160
 # most 4 MiB per file per snapshot so one huge append cannot stall a reply.
 BOOTSTRAP_BYTES = 1 << 20
 READ_LIMIT = 4 << 20
+# An unterminated line kept for the next read; longer lines are dropped.
+MAX_PARTIAL = 1 << 20
+# Session records and subagent metadata are small JSON files.
+MAX_RECORD = 64 << 10
 # Activity windows, in seconds.
 WORKING_WINDOW = 20
 SUBAGENT_WINDOW = 15
@@ -48,6 +53,9 @@ FILE_TOOLS = EDIT_TOOLS | {"Read"}
 SPAWN_TOOLS = {"Agent", "Task"}
 # Session ids and rollout names become agent ids and glob patterns; anything else is skipped.
 SAFE_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
+# Search patterns that may contain credentials are not shown.
+SECRET_WORD = re.compile(r"(?i)pass(word|wd)?|secret|token|api[_-]?key|bearer|authorization|credential|private[_-]?key")
+TOKEN_LIKE = re.compile(r"[A-Za-z0-9+/_=-]{20,}")
 
 
 def now_ms() -> int:
@@ -66,6 +74,28 @@ def parse_ms(value) -> int | None:
 def clip(value, limit: int = MAX_TEXT) -> str:
     text = "".join(ch if ch.isprintable() else " " for ch in str(value))
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def search_target(pattern) -> str:
+    """A search pattern or query, redacted when it names or looks like a credential."""
+    text = str(pattern or "")
+    if SECRET_WORD.search(text) or any(
+        re.search(r"[0-9]", run) and re.search(r"[A-Za-z]", run) for run in TOKEN_LIKE.findall(text)
+    ):
+        return "[redacted]"
+    return clip(text, 48)
+
+
+def read_json(path: Path):
+    """Parse a small regular file; FIFOs, devices and oversized files raise ValueError."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "rb") as handle:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("not a regular file")
+        data = handle.read(MAX_RECORD + 1)
+    if len(data) > MAX_RECORD:
+        raise ValueError("file too large")
+    return json.loads(data)
 
 
 def program_name(command) -> str:
@@ -112,19 +142,21 @@ class Tail:
         self.offset: int | None = None
         self.inode = None
         self.rest = b""
+        # Set while the rest of an overlong line is still arriving.
+        self.discard = False
 
     def read(self):
         try:
-            stat = self.path.stat()
+            info = self.path.stat()
         except OSError:
             return []
-        if self.inode != stat.st_ino or (self.offset is not None and stat.st_size < self.offset):
-            self.inode, self.offset, self.rest = stat.st_ino, None, b""
+        if self.inode != info.st_ino or (self.offset is not None and info.st_size < self.offset):
+            self.inode, self.offset, self.rest, self.discard = info.st_ino, None, b"", False
         skip_partial = False
         if self.offset is None:
-            self.offset = max(0, stat.st_size - BOOTSTRAP_BYTES)
+            self.offset = max(0, info.st_size - BOOTSTRAP_BYTES)
             skip_partial = self.offset > 0
-        if stat.st_size <= self.offset:
+        if info.st_size <= self.offset:
             return []
         try:
             with self.path.open("rb") as handle:
@@ -136,10 +168,11 @@ class Tail:
         data = self.rest + data
         lines = data.split(b"\n")
         self.rest = lines.pop()
-        if len(self.rest) > READ_LIMIT:
-            self.rest = b""
-        if skip_partial and lines:
+        if (skip_partial or self.discard) and lines:
             lines.pop(0)
+            self.discard = False
+        if len(self.rest) > MAX_PARTIAL:
+            self.rest, self.discard = b"", True
         entries = []
         for line in lines:
             try:
@@ -290,7 +323,7 @@ class Collector:
 
     def claude_record(self, record_path: Path, at_ms: int, seen: set[str]) -> None:
         try:
-            record = json.loads(record_path.read_text())
+            record = read_json(record_path)
             session_id = str(record["sessionId"])
             cwd = str(record.get("cwd") or "")
         except (OSError, ValueError, KeyError, TypeError):
@@ -314,8 +347,12 @@ class Collector:
         if transcripts:
             for entry in agent.tail(transcripts[0]).read():
                 self.safely(self.claude_entry, agent, entry, "")
-            for sub in sorted(transcripts[0].with_suffix("").glob("subagents/agent-*.jsonl"))[-32:]:
+            subagents = sorted(transcripts[0].with_suffix("").glob("subagents/agent-*.jsonl"))[-32:]
+            for sub in subagents:
                 self.safely(self.claude_subagent, agent, sub, at_ms)
+            # Forget readers of transcripts that are no longer listed.
+            for path in set(agent.tails) - {transcripts[0], *subagents}:
+                del agent.tails[path]
 
     def claude_subagent(self, agent: Agent, path: Path, at_ms: int) -> None:
         key = path.stem
@@ -329,7 +366,7 @@ class Collector:
         if sub is None:
             meta = {}
             try:
-                meta = json.loads(path.with_name(key + ".meta.json").read_text())
+                meta = read_json(path.with_name(key + ".meta.json"))
             except (OSError, ValueError):
                 pass
             kind = str(meta.get("agentType") or "agent")
@@ -380,7 +417,7 @@ class Collector:
         elif tool == "Bash":
             target = program_name(data.get("command"))
         elif tool in ("Grep", "Glob"):
-            target = clip(data.get("pattern") or "", 48)
+            target = search_target(data.get("pattern"))
         elif tool == "WebFetch":
             url = str(data.get("url") or "")
             target = clip(url.split("://", 1)[-1].split("/", 1)[0], 60)
@@ -459,7 +496,7 @@ class Collector:
                     agent.touch(at_ms, target, False)
                     agent.call(at_ms, "read", target, self.events)
             elif parsed and parsed[0].get("type") in ("search", "list_files"):
-                agent.call(at_ms, str(parsed[0]["type"]).replace("_", " "), clip(parsed[0].get("query") or "", 48), self.events)
+                agent.call(at_ms, str(parsed[0]["type"]).replace("_", " "), search_target(parsed[0].get("query")), self.events)
             else:
                 agent.call(at_ms, "shell", program_name(item.get("command")), self.events)
         elif kind == "FileChange" and isinstance(item.get("changes"), dict):

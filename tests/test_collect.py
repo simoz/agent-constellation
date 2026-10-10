@@ -172,6 +172,36 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual([a["id"] for a in snapshot["agents"]], ["claude:s-1"])
         self.assertEqual(snapshot["status"], "partial")
 
+    def test_session_records_must_be_small_regular_files(self):
+        # docs/security-review.md L2: a FIFO would block and a huge record would be read whole.
+        self.session("s1")
+        self.session("s2", padding="x" * (collect.MAX_RECORD + 1))
+        os.mkfifo(self.claude / "sessions" / "fifo.json")
+        snapshot = self.collector().snapshot("r")
+        self.assertEqual([a["id"] for a in snapshot["agents"]], ["claude:s1"])
+
+    def test_search_patterns_with_credentials_are_redacted(self):
+        # docs/security-review.md L3.
+        cases = {"has_many": "has_many", "**/*.rb": "**/*.rb", "password = ": "[redacted]",
+                 "API_KEY": "[redacted]", "sk-ant-api03-a1B2c3D4e5F6g7H8": "[redacted]",
+                 "validates_presence_of_name": "validates_presence_of_name"}
+        for pattern, expected in cases.items():
+            self.assertEqual(collect.search_target(pattern), expected, pattern)
+
+    def test_overlong_partial_line_is_dropped(self):
+        # docs/security-review.md L4: the unterminated rest is capped, and its tail is not parsed later.
+        transcript = self.transcripts / "s1.jsonl"
+        transcript.write_text("")
+        tail = collect.Tail(transcript)
+        self.assertEqual(tail.read(), [])
+        with transcript.open("a") as handle:
+            handle.write("x" * (collect.MAX_PARTIAL + 10))
+        self.assertEqual(tail.read(), [])
+        self.assertEqual(tail.rest, b"")
+        with transcript.open("a") as handle:
+            handle.write('{"type": "fragment"}\n{"type": "ok"}\n')
+        self.assertEqual(tail.read(), [{"type": "ok"}])
+
     def test_disabled_sources(self):
         self.session()
         snapshot = self.collector(()).snapshot("r")

@@ -15,9 +15,9 @@ were reproduced, not inferred.
 | M1 | Medium | Unexpected JSON shapes crash the collector, and the restart loop ends in a permanent error | Fixed |
 | M2 | Medium | Unsanitized agent ids make the UI reject every snapshot | Fixed |
 | L1 | Low | `sessionId` is used unvalidated in a glob pattern | Fixed |
-| L2 | Low | Session records are read whole, without a size limit | Open |
-| L3 | Low | Search patterns and Codex queries may show secrets on screen | Open |
-| L4 | Low | Partial lines are retained per file, up to 4 MiB each | Open |
+| L2 | Low | Session records are read whole, without a size limit | Fixed |
+| L3 | Low | Search patterns and Codex queries may show secrets on screen | Fixed |
+| L4 | Low | Partial lines are retained per file, up to 4 MiB each | Fixed |
 | I1 | Info | `python3` is resolved through `PATH` | Accepted |
 | I2 | Info | Snapshot data is reachable by other plugins in the shared scene | Accepted |
 | I3 | Info | Preview directories under `/tmp` are never removed | Open |
@@ -145,6 +145,10 @@ read longer than 5 s also trips the UI watchdog (see M1 for the retry outcome).
 **Fix**: skip records that are not regular files or exceed 64 KiB (`stat`
 before reading, then read at most that many bytes).
 
+**Status**: fixed. `read_json` opens session records and subagent metadata
+without blocking, rejects anything but a regular file and reads at most 64 KiB.
+Regression test: `test_session_records_must_be_small_regular_files`.
+
 ### L3 — Search patterns and Codex queries may show secrets on screen
 
 **Where**: `claude_tool` (`Grep`/`Glob` pattern, `WebFetch` host) and
@@ -159,6 +163,14 @@ log and on any screen share.
 credentials (long high-entropy tokens, `key=`, `token`, `password`). Document
 the choice in the README section on what the data means.
 
+**Status**: fixed by masking. `search_target` shows `[redacted]` for a Grep or
+Glob pattern or a Codex search query that contains a credential word
+(`password`, `secret`, `token`, `api_key`, `bearer`, `authorization`,
+`credential`, `private_key`) or a run of 20 or more token characters mixing
+letters and digits. Other patterns are shown truncated, as before; the README
+documents this. Masking is a heuristic: an unusual secret can still pass.
+Regression test: `test_search_patterns_with_credentials_are_redacted`.
+
 ### L4 — Partial lines are retained per file, up to 4 MiB each
 
 **Where**: `Tail.read`, `self.rest`.
@@ -169,6 +181,12 @@ memory can reach hundreds of MiB in the worst case.
 
 **Fix**: drop `rest` above 1 MiB (one transcript entry is rarely larger), and
 cap the number of tracked tails.
+
+**Status**: fixed. An unterminated line longer than 1 MiB is dropped, and the
+rest of it is discarded when it arrives instead of being parsed as a new line.
+Readers of subagent transcripts that are no longer among the 32 listed are
+forgotten, so each Claude session keeps at most 33. Regression test:
+`test_overlong_partial_line_is_dropped`.
 
 ### I1 — `python3` is resolved through `PATH`
 
@@ -232,6 +250,8 @@ for session records.
 2. Fix L1 with the same id validation, and L2 with a size and file-type check.
 3. Decide how much of search patterns to show (L3) and document it.
 4. Tighten L4 and I3 when convenient.
+
+All of these are done except I3, which remains open.
 
 ## Reproduction
 
