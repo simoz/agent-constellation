@@ -70,7 +70,7 @@ before the snapshot replaces the previous one.
 
 Transcripts contain prompts, model output, command lines and tool results. The
 collector emits only tool names, file paths relative to the session directory
-(or `~/…`), program names without arguments, search patterns and hosts (both
+(or `~/…`, or `…/name` outside both), program names without arguments, search patterns and hosts (both
 truncated; patterns that name or look like credentials are redacted), subagent names, model names, token counts and status. It writes
 nothing and makes no network requests. Snapshots stay in memory.
 

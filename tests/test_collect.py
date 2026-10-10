@@ -231,6 +231,15 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(agent["subagents"], [{"id": "t2-guardian", "name": "guardian", "type": "guardian"}])
         self.assertEqual((agent["activity"]["tool"], agent["activity"]["target"], agent["activity"]["subagent"]), ("shell", "git", "guardian"))
 
+    def test_old_files_are_hidden_and_outside_paths_shortened(self):
+        self.session()
+        self.append(self.transcripts / "s1.jsonl",
+                    tool("Read", {"file_path": PROJECT + "/old.rb"}, "m1", offset=-16 * 60),
+                    tool("Read", {"file_path": "/tmp/scratch/shots/crop.png"}, "m2"),
+                    tool("Read", {"file_path": str(Path.home() / "notes.md")}, "m3"))
+        files = [f["path"] for f in self.collector().snapshot("r")["agents"][0]["files"]]
+        self.assertEqual(sorted(files), ["~/notes.md", "\u2026/crop.png"])
+
     def test_disabled_sources(self):
         self.session()
         snapshot = self.collector(()).snapshot("r")

@@ -49,6 +49,8 @@ TOKEN_WINDOW = 60
 BUCKET_SECONDS = 10
 BUCKETS = 30
 HEAT_HALF_LIFE = 300
+# Files untouched for longer leave the constellation.
+FILE_WINDOW = 900
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 FILE_TOOLS = EDIT_TOOLS | {"Read"}
@@ -146,6 +148,9 @@ def display_path(path, cwd: str, home: str) -> str:
         path = os.path.relpath(path, cwd)
     elif home and path.startswith(home.rstrip("/") + "/"):
         path = "~/" + path[len(home.rstrip("/")) + 1 :]
+    elif path.startswith("/"):
+        # Outside the project and home, the name says enough and keeps labels short.
+        path = "…/" + os.path.basename(path.rstrip("/"))
     return clip(path)
 
 
@@ -263,7 +268,8 @@ class Agent:
         def score(entry):
             return entry["score"] * math.exp(-max(0, at_ms - entry["lastMs"]) / 1000 / HEAT_HALF_LIFE * math.log(2))
 
-        ranked = sorted(self.files.items(), key=lambda item: score(item[1]), reverse=True)[:MAX_FILES]
+        recent = [item for item in self.files.items() if at_ms - item[1]["lastMs"] <= FILE_WINDOW * 1000]
+        ranked = sorted(recent, key=lambda item: score(item[1]), reverse=True)[:MAX_FILES]
         top = max([score(entry) for _, entry in ranked] + [1.0])
         buckets = [0] * BUCKETS
         for at in self.call_times:
