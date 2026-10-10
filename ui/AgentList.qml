@@ -115,7 +115,7 @@ Item {
                 }
                 Sparkline {
                     width: parent.width - 6
-                    height: Math.max(18, card.height - 4 - y)
+                    height: Math.max(18, card.availableHeight - y)
                     values: card.modelData.activityBuckets
                     ink: card.ink
                 }
