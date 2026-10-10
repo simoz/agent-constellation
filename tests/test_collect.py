@@ -139,6 +139,39 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(agent["outputTokens"], 42)
         self.append(rollout, {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_complete"}})
 
+    def test_unexpected_shapes_are_skipped(self):
+        # Inputs from docs/security-review.md (M1): valid JSON with unexpected types or depth.
+        self.session()
+        self.session("s2", status=["busy"])
+        transcript = self.transcripts / "s1.jsonl"
+        self.append(transcript,
+                    tool("MultiEdit", {"file_path": PROJECT + "/a.rb", "edits": 5}, "m1"),
+                    {"type": "assistant", "timestamp": iso(), "message": {"id": "m2", "content": 7}})
+        with transcript.open("a") as handle:
+            handle.write("[" * 100_000 + "]" * 100_000 + "\n")
+        self.append(transcript, tool("Read", {"file_path": PROJECT + "/b.rb"}, "m3"))
+        rollout = self.codex / "sessions" / time.strftime("%Y/%m/%d") / "rollout-x.jsonl"
+        self.append(rollout,
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {"type": "CommandExecution", "parsed_cmd": 3}}},
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
+        snapshot = self.collector().snapshot("r")
+        self.assertEqual(snapshot["status"], "partial")
+        agents = {a["id"]: a for a in snapshot["agents"]}
+        self.assertEqual(agents["claude:s1"]["activity"]["target"], "b.rb")
+        self.assertEqual(agents["codex:x"]["status"], "thinking")
+
+    def test_unsafe_ids_are_skipped(self):
+        # docs/security-review.md M2 and L1: ids end up in the protocol and in a glob pattern.
+        self.session("bad", sessionId="s\n1")
+        self.session("escape", sessionId="../../outside")
+        self.append(self.claude / "outside.jsonl", tool("Read", {"file_path": PROJECT + "/x.rb"}))
+        self.session("ok", sessionId="s-1")
+        self.append(self.codex / "sessions" / time.strftime("%Y/%m/%d") / "rollout-a\x1bb.jsonl",
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
+        snapshot = self.collector().snapshot("r")
+        self.assertEqual([a["id"] for a in snapshot["agents"]], ["claude:s-1"])
+        self.assertEqual(snapshot["status"], "partial")
+
     def test_disabled_sources(self):
         self.session()
         snapshot = self.collector(()).snapshot("r")

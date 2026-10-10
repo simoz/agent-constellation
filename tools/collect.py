@@ -46,6 +46,8 @@ HEAT_HALF_LIFE = 300
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 FILE_TOOLS = EDIT_TOOLS | {"Read"}
 SPAWN_TOOLS = {"Agent", "Task"}
+# Session ids and rollout names become agent ids and glob patterns; anything else is skipped.
+SAFE_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
 
 def now_ms() -> int:
@@ -142,7 +144,7 @@ class Tail:
         for line in lines:
             try:
                 entry = json.loads(line)
-            except ValueError:
+            except (ValueError, RecursionError):
                 continue
             if isinstance(entry, dict):
                 entries.append(entry)
@@ -257,6 +259,14 @@ class Collector:
         self.events: deque = deque(maxlen=MAX_EVENTS)
         self.session = secrets.token_hex(8)
         self.sequence = 0
+        self.skipped = 0
+
+    def safely(self, handler, *args) -> None:
+        """Run one record or entry handler; input of an unexpected shape is skipped, not fatal."""
+        try:
+            handler(*args)
+        except Exception:
+            self.skipped += 1
 
     # Claude Code -----------------------------------------------------------
 
@@ -275,31 +285,37 @@ class Collector:
         if not sessions.is_dir():
             return "missing"
         for record_path in sorted(sessions.glob("*.json"))[:256]:
-            try:
-                record = json.loads(record_path.read_text())
-                session_id = str(record["sessionId"])
-                cwd = str(record.get("cwd") or "")
-            except (OSError, ValueError, KeyError, TypeError):
-                continue
-            if record.get("spare") or not self.process_alive(record.get("pid"), record.get("procStart")):
-                continue
-            status = {"busy": "working", "waiting": "waiting"}.get(record.get("status"), "idle")
-            changed = record.get("statusUpdatedAt") or record.get("updatedAt") or at_ms
-            if status == "idle" and isinstance(changed, (int, float)) and at_ms - changed > self.idle_ms:
-                continue
-            ident = "claude:" + session_id
-            agent = self.agents.get(ident) or Agent(ident, "claude", cwd)
-            self.agents[ident] = agent
-            seen.add(ident)
-            agent.status = status
-            agent.waiting_for = str(record.get("waitingFor") or "")
-            transcripts = list(self.claude_dir.glob("projects/*/" + session_id + ".jsonl"))
-            if transcripts:
-                for entry in agent.tail(transcripts[0]).read():
-                    self.claude_entry(agent, entry, "")
-                for sub in sorted(transcripts[0].with_suffix("").glob("subagents/agent-*.jsonl"))[-32:]:
-                    self.claude_subagent(agent, sub, at_ms)
+            self.safely(self.claude_record, record_path, at_ms, seen)
         return "ok"
+
+    def claude_record(self, record_path: Path, at_ms: int, seen: set[str]) -> None:
+        try:
+            record = json.loads(record_path.read_text())
+            session_id = str(record["sessionId"])
+            cwd = str(record.get("cwd") or "")
+        except (OSError, ValueError, KeyError, TypeError):
+            return
+        if not SAFE_ID.fullmatch(session_id):
+            self.skipped += 1
+            return
+        if record.get("spare") or not self.process_alive(record.get("pid"), record.get("procStart")):
+            return
+        status = {"busy": "working", "waiting": "waiting"}.get(record.get("status"), "idle")
+        changed = record.get("statusUpdatedAt") or record.get("updatedAt") or at_ms
+        if status == "idle" and isinstance(changed, (int, float)) and at_ms - changed > self.idle_ms:
+            return
+        ident = "claude:" + session_id
+        agent = self.agents.get(ident) or Agent(ident, "claude", cwd)
+        self.agents[ident] = agent
+        seen.add(ident)
+        agent.status = status
+        agent.waiting_for = str(record.get("waitingFor") or "")
+        transcripts = list(self.claude_dir.glob("projects/*/" + session_id + ".jsonl"))
+        if transcripts:
+            for entry in agent.tail(transcripts[0]).read():
+                self.safely(self.claude_entry, agent, entry, "")
+            for sub in sorted(transcripts[0].with_suffix("").glob("subagents/agent-*.jsonl"))[-32:]:
+                self.safely(self.claude_subagent, agent, sub, at_ms)
 
     def claude_subagent(self, agent: Agent, path: Path, at_ms: int) -> None:
         key = path.stem
@@ -320,7 +336,7 @@ class Collector:
             sub = agent.subagents[key] = {"name": str(meta.get("name") or kind), "type": kind, "startedMs": modified, "lastMs": modified}
         sub["lastMs"] = modified
         for entry in agent.tail(path).read():
-            self.claude_entry(agent, entry, sub["name"])
+            self.safely(self.claude_entry, agent, entry, sub["name"])
 
     def claude_entry(self, agent: Agent, entry: dict, subagent: str) -> None:
         if entry.get("type") != "assistant":
@@ -385,13 +401,17 @@ class Collector:
                     modified = int(path.stat().st_mtime * 1000)
                 except OSError:
                     continue
-                ident = "codex:" + path.stem.removeprefix("rollout-")
+                stem = path.stem.removeprefix("rollout-")
+                if not SAFE_ID.fullmatch(stem):
+                    self.skipped += 1
+                    continue
+                ident = "codex:" + stem
                 if at_ms - modified > self.idle_ms and ident not in self.agents:
                     continue
                 agent = self.agents.get(ident) or Agent(ident, "codex", "")
                 self.agents[ident] = agent
                 for entry in agent.tail(path).read():
-                    self.codex_entry(agent, entry)
+                    self.safely(self.codex_entry, agent, entry)
                 working_stale = agent.status == "working" and at_ms - modified > CODEX_STALE_WORKING * 1000
                 if working_stale:
                     agent.status = "idle"
@@ -460,6 +480,7 @@ class Collector:
         at_ms = now_ms()
         seen: set[str] = set()
         sources, partial = {}, False
+        self.skipped = 0
         for name, reader in (("claude", self.claude), ("codex", self.codex)):
             if name not in self.sources:
                 sources[name] = "disabled"
@@ -482,7 +503,7 @@ class Collector:
             "session": self.session,
             "sequence": self.sequence,
             "observedAtMs": at_ms,
-            "status": "partial" if partial or len(agents) > MAX_AGENTS else "ok",
+            "status": "partial" if partial or self.skipped or len(agents) > MAX_AGENTS else "ok",
             "sources": sources,
             "agents": agents[:MAX_AGENTS],
             "events": sorted((e for e in self.events if e["agent"] in visible), key=lambda e: -e["atMs"]),

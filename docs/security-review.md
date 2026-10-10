@@ -12,9 +12,9 @@ were reproduced, not inferred.
 
 | ID | Severity | Finding | Status |
 | --- | --- | --- | --- |
-| M1 | Medium | Unexpected JSON shapes crash the collector, and the restart loop ends in a permanent error | Open |
-| M2 | Medium | Unsanitized agent ids make the UI reject every snapshot | Open |
-| L1 | Low | `sessionId` is used unvalidated in a glob pattern | Open |
+| M1 | Medium | Unexpected JSON shapes crash the collector, and the restart loop ends in a permanent error | Fixed |
+| M2 | Medium | Unsanitized agent ids make the UI reject every snapshot | Fixed |
+| L1 | Low | `sessionId` is used unvalidated in a glob pattern | Fixed |
 | L2 | Low | Session records are read whole, without a size limit | Open |
 | L3 | Low | Search patterns and Codex queries may show secrets on screen | Open |
 | L4 | Low | Partial lines are retained per file, up to 4 MiB each | Open |
@@ -78,7 +78,12 @@ same last 1 MiB of the transcript and crashes again, so the view ends in
 "Collector stopped repeatedly" and stays there until the session file ages out
 or the shell restarts. The rest of the shell is not affected.
 
-**Fix**:
+**Status**: fixed. `Tail.read` also skips `RecursionError`; each session
+record, subagent transcript and entry runs through `Collector.safely`, which
+skips input that raises and marks the snapshot `partial`. Regression test:
+`test_unexpected_shapes_are_skipped`.
+
+**Proposed fix**:
 
 - Catch `(ValueError, RecursionError)` around `json.loads` in `Tail.read`.
 - Wrap the processing of each entry and each session record in
@@ -103,7 +108,11 @@ over 200 characters.
 invalid output as fatal ("Invalid or incompatible collector output") and does
 not retry, so the view stays empty for every agent, not only the bad one.
 
-**Fix**: accept only ids matching `^[A-Za-z0-9._-]{1,128}$` for Claude session
+**Status**: fixed. Claude session ids and rollout names outside `SAFE_ID`
+are skipped and mark the snapshot `partial`. Regression test:
+`test_unsafe_ids_are_skipped`.
+
+**Proposed fix**: accept only ids matching `^[A-Za-z0-9._-]{1,128}$` for Claude session
 ids and rollout stems, and skip anything else. Keep the strict check in
 `Protocol.js`: it is the right defence, the collector just has to honour it.
 
@@ -121,6 +130,8 @@ derive tool names and paths from it. Only someone who can already write
 `~/.claude/sessions/` can trigger it, so this is a hardening issue.
 
 **Fix**: the same id validation as M2, before the glob.
+
+**Status**: fixed with M2; the test includes a `../..` session id.
 
 ### L2 — Session records are read whole, without a size limit
 

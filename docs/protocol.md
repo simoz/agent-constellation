@@ -37,7 +37,9 @@ any error reply as fatal for that process.
 
 - `session` changes when the collector restarts; `sequence` then starts at 1
   and must increase within a session.
-- `status` is `partial` when a source failed to read or agents were omitted.
+- `status` is `partial` when a source failed to read, agents were omitted, or
+  input was skipped: a session or rollout id outside `[A-Za-z0-9._-]{1,128}`,
+  or a record or entry of an unexpected shape.
 - `sources.*`: `ok`, `missing` (directory absent), `disabled`, `error`.
 - `agents[].status`: `working`, `thinking`, `waiting`, `idle`. Agents are
   sorted waiting first, then by latest activity.
