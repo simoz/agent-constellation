@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Play the scripted Rails demo (demo/scenario.py) in a live preview window, for
+# recording a video. Never reads real agent sessions or changes the bar.
+# Usage: demo/live [--speed FACTOR] [--no-window]
+#   --no-window  only play the sessions and print their directories, for
+#                pointing the installed plugin's Settings at them
+set -euo pipefail
+repository_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+window=true
+arguments=()
+for argument in "$@"; do
+  if [[ "$argument" == --no-window ]]; then window=false; else arguments+=("$argument"); fi
+done
+work=$(mktemp -d /tmp/constellation-live.XXXXXX)
+preview=
+scenario=
+trap 'kill $scenario 2>/dev/null || true; wait 2>/dev/null || true; rm -rf -- "$work" ${preview:+"$preview"}' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+python3 -B "$repository_dir/demo/scenario.py" "$work/sessions" "${arguments[@]}" & scenario=$!
+if [[ $window == false ]]; then
+  printf '%s\n' "Claude Code directory: $work/sessions/claude" "Codex directory:       $work/sessions/codex" "Ctrl+C stops the demo."
+  wait "$scenario"
+  exit 0
+fi
+preview=$(python3 -B "$repository_dir/tools/prepare_preview.py")
+CONSTELLATION_CLAUDE_DIR="$work/sessions/claude" CONSTELLATION_CODEX_DIR="$work/sessions/codex" qs -p "$preview"

@@ -55,6 +55,21 @@ tests on synthetic sessions, QtTest with a minimal `qs.Commons` facade and
 `git diff --check`. QtTest checks keyboard behavior with a stub service;
 offscreen rendering is not a desktop integration test.
 
+## Recording a video
+
+```bash
+demo/live              # or: demo/live --speed 1.5
+```
+
+`demo/live` plays `demo/scenario.py`, a two-minute loop on fictional Rails
+applications, in a live preview window with the installed theme: `shop`
+(Claude Code) works with Explore and Plan subagents, `bookings` stops for a
+permission after 30 seconds and resumes at 42, `recipes` (Codex) runs two
+tasks, and `invoices` joins at 55 seconds. Closing the window ends the demo and
+removes its files. `demo/live --no-window` only plays the sessions and prints
+their directories: point the installed plugin's Settings at them to record the
+bar and panel, and restore the defaults afterwards.
+
 ## Visual checks and screenshots
 
 `demo/run` renders stills offscreen from the fictional sessions written by
