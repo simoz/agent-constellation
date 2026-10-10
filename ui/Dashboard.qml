@@ -152,7 +152,7 @@ FocusScope {
                         service: root.service
                         active: root.active
                     }
-                    Frame { anchors.fill: parent; emphasized: root.service.totals.waiting > 0; accent: root.service.totals.waiting > 0 ? root.service.palette.role("red") : theme.accent }
+                    Frame { anchors.fill: parent; emphasized: root.service.totals.waiting > 0; accent: root.service.totals.waiting > 0 ? root.service.colors.role("red") : theme.accent }
                     Row {
                         anchors { right: parent.right; bottom: parent.bottom; margins: 12 }
                         spacing: 4
@@ -206,7 +206,7 @@ FocusScope {
                 Label {
                     readonly property var totals: root.service.totals
                     text: "OBSERVED / " + totals.agents + " AGENTS / " + totals.busy + " BUSY / " + totals.waiting + " WAITING"
-                    color: totals.waiting ? root.service.palette.role("red") : theme.accent
+                    color: totals.waiting ? root.service.colors.role("red") : theme.accent
                     font.pixelSize: theme.size * 0.7
                 }
             }

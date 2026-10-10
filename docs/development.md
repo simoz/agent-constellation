@@ -78,4 +78,6 @@ QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic \
 Controls: `CONSTELLATION_THEME` (`light`/`dark`, otherwise the installed
 theme), `CONSTELLATION_WIDTH`, `CONSTELLATION_HEIGHT`,
 `CONSTELLATION_CAPTURE_DELAY` and `CONSTELLATION_BENCHMARK=1`, which reports
-timer intervals and canvas repaints over 120 animation ticks.
+timer intervals and static-canvas repaints over 120 ticks. After changes to the
+moving parts, compare the preview's CPU use with `CONSTELLATION_STILL=1`
+(animation off), for example with `top -p`.

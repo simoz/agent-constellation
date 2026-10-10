@@ -15,10 +15,14 @@ collector reads local agent session files; nothing else runs outside the shell.
   selection and animation state across views.
 - `Collector.qml` owns the single collector process, snapshot requests, bounded
   framing and retry state.
-- `ui/Constellation.qml` draws the scene on two canvases: static geometry and
-  labels repaint only when data, size, selection or theme change; motion
-  (particles, subagent orbits, core pulses, waiting edges) repaints at about
-  30 fps only while the view is visible and animation is on.
+- `ui/Constellation.qml` draws static geometry and labels on one canvas,
+  repainted only when data, size, selection or theme change. Moving parts
+  (`ui/AgentMotion.qml`, `ui/Particle.qml`: particles, subagent orbits, core
+  pulses, ripples, waiting edges) are scene-graph items whose positions derive
+  from one scene clock ticking at 30 fps, only while the view is visible and
+  animation is on. A full-window canvas repainted every frame cost about a third
+  of a core inside the shell; vsync-driven animations still rendered at 60 fps.
+  With the timer, an open window costs about 12% of a core on the test VM.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

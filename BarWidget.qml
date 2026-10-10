@@ -48,7 +48,7 @@ UI.BarWidget {
         labelVisible: false
         hasVisualContent: true
         dimmed: !root.service || !root.service.demanded
-        readonly property color alert: root.service ? root.service.palette.role("red") : foreground
+        readonly property color alert: root.service ? root.service.colors.role("red") : foreground
         readonly property bool compact: root.vertical || root.agents.length === 0
         fixedWidth: compact ? barSize : barContents.implicitWidth + scaledHorizontalMargin * 2
         fixedHeight: root.vertical && root.agents.length ? barContents.implicitHeight + scaledVerticalPadding * 2 : barSize

@@ -92,7 +92,6 @@ ShellRoot {
                 meanIntervalMs: root.sampleIntervals.reduce(function(a, b) { return a + b; }, 0) / sorted.length,
                 p95IntervalMs: sorted[Math.floor(sorted.length * 0.95)],
                 canvasPaints: dashboard.scene.paintCount,
-                basePaints: dashboard.scene.basePaintCount,
                 agents: service.agents.length
             }));
             Qt.quit();

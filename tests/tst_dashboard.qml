@@ -9,7 +9,7 @@ Item {
     height: 820
 
     QtObject {
-        id: palette
+        id: themeColors
         property var values: ({})
         property bool light: false
         function role(name) { return Qt.lighter(name === "red" ? "#d27a7a" : "#83b6a6", 1); }
@@ -17,7 +17,7 @@ Item {
     }
     QtObject {
         id: service
-        property var palette: palette
+        property var colors: themeColors
         property bool paused: false
         property bool animating: true
         property bool reducedMotion: true
@@ -45,7 +45,7 @@ Item {
                 activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1),
                 subagents: [], files: [{path: "a.rb", touches: 1, edits: 1, added: 1, removed: 0, heat: 1, lastMs: 0, subagent: ""}]};
         }
-        function agentColor(a) { return palette.role(Model.agentRole(a, {})); }
+        function agentColor(a) { return themeColors.role(Model.agentRole(a, {})); }
         function agentById(id) { return agents.filter(function(a) { return a.id === id; })[0] || null; }
         function select(id) { selection = selection === id ? "" : id; }
         function refresh() { refreshes++; }

@@ -35,9 +35,9 @@ Item {
         if (codexDir) args.push("--codex-dir", codexDir);
         return args;
     }
-    // Shared by every view: theme palette roles read from the active Omarchy theme.
-    readonly property alias palette: palette
-    Constellation.Palette { id: palette }
+    // Shared by every view: named theme colors read from the active Omarchy theme.
+    readonly property alias colors: themeColors
+    Constellation.Palette { id: themeColors }
     Loader {
         id: transport
         active: root.shell !== null || root.standalone
@@ -101,7 +101,7 @@ Item {
     }
     property var roles: ({})
     onAgentsChanged: roles = Model.assignRoles(agents, roles)
-    function agentColor(agent) { return palette.role(Model.agentRole(agent, roles)); }
+    function agentColor(agent) { return themeColors.role(Model.agentRole(agent, roles)); }
     function agentById(id) { return agents.filter(function(a) { return a.id === id; })[0] || null; }
     function select(id) { selection = selection === id ? "" : id; }
     onSelectedChanged: if (selection && !selected) selection = ""

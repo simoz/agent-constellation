@@ -4,17 +4,16 @@ import "../Model.js" as Model
 
 // Agent cores with orbiting subagents; tool calls fly out to the files they touch
 // and hot files glow. Static geometry and labels live on one canvas repainted
-// only when data, size, selection or theme change; motion is a second canvas
-// redrawn at about 30 fps while visible, active and animating.
+// only when data, size, selection or theme change; motion uses scene-graph
+// items (AgentMotion) that run only while visible, active and animating.
 FocusScope {
     id: root
     objectName: "constellationScene"
     required property var service
     property bool active: true
     property int paintCount: 0
-    property int basePaintCount: 0
-    readonly property var palette: service.palette
-    readonly property bool light: palette.light
+    readonly property var colors: service.colors
+    readonly property bool light: colors.light
     property real time: 0
     readonly property bool running: active && visible && service.moving && width > 0 && height > 0
     readonly property string fontFamily: theme.font
@@ -37,9 +36,8 @@ FocusScope {
         });
     }
     readonly property string paintKey: JSON.stringify(service.snapshot ? service.snapshot.sequence : 0) + service.selection
-        + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(palette.values) + light
-    onPaintKeyChanged: { base.requestPaint(); motion.requestPaint(); }
-    onRunningChanged: if (!running) motion.requestPaint()
+        + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
+    onPaintKeyChanged: base.requestPaint()
 
     function css(c, a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + (a === undefined ? c.a : a) + ")"; }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
@@ -91,12 +89,12 @@ FocusScope {
         anchors.fill: parent
         renderStrategy: Canvas.Cooperative
         onPaint: {
-            root.paintCount++; root.basePaintCount++;
+            root.paintCount++;
             var c = getContext("2d"), w = width, h = height, fg = theme.text, bg = theme.background;
             c.reset();
             var vignette = c.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, Math.max(w, h) * 0.75);
             vignette.addColorStop(0, root.css(bg, 1));
-            vignette.addColorStop(1, root.css(root.palette.mix(bg, root.light ? Qt.rgba(1, 1, 1, 1) : Qt.rgba(0, 0, 0, 1), 0.3), 1));
+            vignette.addColorStop(1, root.css(root.colors.mix(bg, root.light ? Qt.rgba(1, 1, 1, 1) : Qt.rgba(0, 0, 0, 1), 0.3), 1));
             c.fillStyle = vignette; c.fillRect(0, 0, w, h);
             // Grid dots and fixed stars, seeded so they never jump between repaints.
             c.fillStyle = root.css(fg, 0.04);
@@ -127,11 +125,24 @@ FocusScope {
                     edge.addColorStop(0, root.css(color, 0.25 * dim));
                     edge.addColorStop(1, root.css(color, (0.04 + node.heat * 0.16) * dim));
                     c.strokeStyle = edge; c.lineWidth = 1; c.beginPath(); c.moveTo(entry.x, entry.y); c.lineTo(node.x, node.y); c.stroke();
-                    var hot = node.heat > 0.6 ? root.palette.role("orange") : color, glow = 8 + node.heat * 26;
+                    var hot = node.heat > 0.6 ? root.colors.role("orange") : color, glow = 8 + node.heat * 26;
                     var g = c.createRadialGradient(node.x, node.y, 0, node.x, node.y, glow);
                     g.addColorStop(0, root.css(hot, (0.2 + node.heat * 0.45) * dim)); g.addColorStop(1, root.css(hot, 0));
                     c.fillStyle = g; c.beginPath(); c.arc(node.x, node.y, glow, 0, Math.PI * 2); c.fill();
                     c.fillStyle = root.css(hot, 0.9 * dim); c.beginPath(); c.arc(node.x, node.y, 2.5 + node.heat * 4, 0, Math.PI * 2); c.fill();
+                });
+            });
+            // Subagent orbits are static; the moving dots live in AgentMotion.
+            entries.forEach(function(entry) {
+                var dim = root.dimmed(entry) ? 0.3 : 1;
+                entry.agent.subagents.forEach(function(sub, index) {
+                    var ring = (52 + index * 18) * root.scale, ink = root.colors.role(Model.subagentRole(index));
+                    c.strokeStyle = root.css(ink, 0.25 * dim); c.lineWidth = 1; c.beginPath();
+                    for (var d = 0; d < Math.PI * 2; d += 0.16) {
+                        c.moveTo(entry.x + Math.cos(d) * ring, entry.y + Math.sin(d) * ring * 0.82);
+                        c.lineTo(entry.x + Math.cos(d + 0.06) * ring, entry.y + Math.sin(d + 0.06) * ring * 0.82);
+                    }
+                    c.stroke();
                 });
             });
             c.globalCompositeOperation = "source-over";
@@ -142,7 +153,7 @@ FocusScope {
                     c.font = root.font(400, 11); c.fillStyle = root.css(fg, (0.35 + node.heat * 0.55) * dim);
                     c.fillText(node.name, node.x, node.y + 20 + node.heat * 5);
                     if ((node.file.added || node.file.removed) && node.heat > 0.25) {
-                        c.font = root.font(400, 10); c.fillStyle = root.css(root.palette.role("green"), 0.8 * dim);
+                        c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.role("green"), 0.8 * dim);
                         c.fillText("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
                     }
                 });
@@ -155,91 +166,53 @@ FocusScope {
             });
         }
     }
-    Canvas {
+    // Moving parts are scene-graph items driven by one 30 fps clock. A full-window
+    // canvas repainted every frame cost about a third of a core in the shell
+    // process; vsync-driven animations still rendered the window at 60 fps.
+    // Count-based models keep delegates (and their trail state) alive
+    // across snapshots, which arrive every second as new arrays.
+    Item {
         id: motion
         anchors.fill: parent
-        renderStrategy: Canvas.Cooperative
-        onPaint: {
-            root.paintCount++;
-            var c = getContext("2d"), t = root.time;
-            c.reset();
-            var waiting = false;
-            c.globalCompositeOperation = root.light ? "source-over" : "lighter";
-            root.scene.forEach(function(entry) {
-                var agent = entry.agent, color = entry.color, dim = root.dimmed(entry) ? 0.3 : 1;
-                var status = agent.status, busy = status === "working" || status === "thinking";
-                if (status === "waiting") waiting = true;
-                // Particles: outbound in the agent color, returning results in cyan.
-                var recent = agent.activityBuckets.slice(-3).reduce(function(a, b) { return a + b; }, 0);
-                var count = busy && entry.files.length ? Math.min(18, 3 + recent * 2) : 0, back = root.palette.role("cyan");
-                for (var p = 0; p < count; p++) {
-                    var key = agent.id + "#" + p, node = entry.files[Math.floor(Model.unit(key + "n") * Math.min(entry.files.length, 6))];
-                    var speed = 0.25 + Model.unit(key + "s") * 0.35, returning = Model.unit(key + "b") < 0.3;
-                    var bend = (Model.unit(key + "c") - 0.5) * entry.radius * 0.6;
-                    var progress = (t * speed * (status === "thinking" ? 0.5 : 1) + Model.unit(key + "p")) % 1;
-                    if (returning) progress = 1 - progress;
-                    var ink = returning ? back : color;
-                    for (var k = 0; k < 10; k++) {
-                        var q = returning ? progress + k * 0.018 : progress - k * 0.018;
-                        if (q < 0 || q > 1) break;
-                        var point = root.bezier(entry, node, q, bend);
-                        c.fillStyle = root.css(ink, (1 - k / 10) * 0.8 * dim);
-                        c.beginPath(); c.arc(point[0], point[1], 2.6 * (1 - k / 13), 0, Math.PI * 2); c.fill();
-                    }
+        Repeater {
+            model: root.scene.length
+            AgentMotion {
+                required property int index
+                entry: root.scene[index]
+                colors: root.colors
+                scale: root.scale
+                fontFamily: root.fontFamily
+                time: root.time
+                opacity: root.dimmed(entry) ? 0.3 : 1
+            }
+        }
+    }
+    // The scene edges glow red while any agent waits for input.
+    Item {
+        id: waitingEdges
+        anchors.fill: parent
+        visible: root.service.totals.waiting > 0
+        readonly property real band: Math.min(width, height) * 0.05
+        readonly property color red: root.colors.role("red")
+        opacity: 0.65 + 0.2 * Math.sin(root.time * 3)
+        Repeater {
+            model: 4
+            Rectangle {
+                id: edge
+                required property int index
+                readonly property bool vertical: index > 1
+                // Top and left fade inwards from their outer edge; bottom and right are mirrored.
+                readonly property bool mirrored: index === 1 || index === 3
+                readonly property color glow: Qt.rgba(waitingEdges.red.r, waitingEdges.red.g, waitingEdges.red.b, 0.3)
+                x: index === 3 ? waitingEdges.width - width : 0
+                y: index === 1 ? waitingEdges.height - height : 0
+                width: vertical ? waitingEdges.band : waitingEdges.width
+                height: vertical ? waitingEdges.height : waitingEdges.band
+                gradient: Gradient {
+                    orientation: edge.vertical ? Gradient.Horizontal : Gradient.Vertical
+                    GradientStop { position: 0; color: edge.mirrored ? "transparent" : edge.glow }
+                    GradientStop { position: 1; color: edge.mirrored ? edge.glow : "transparent" }
                 }
-                // Subagents orbit the core with a short trail.
-                agent.subagents.forEach(function(sub, index) {
-                    var ring = (52 + index * 18) * root.scale, angle = t * (0.6 - index * 0.12) + index * 2.4;
-                    var ink = root.palette.role(Model.subagentRole(index));
-                    c.strokeStyle = root.css(ink, 0.25 * dim); c.lineWidth = 1; c.beginPath();
-                    for (var d = 0; d < Math.PI * 2; d += 0.16) {
-                        c.moveTo(entry.x + Math.cos(d) * ring, entry.y + Math.sin(d) * ring * 0.82);
-                        c.lineTo(entry.x + Math.cos(d + 0.06) * ring, entry.y + Math.sin(d + 0.06) * ring * 0.82);
-                    }
-                    c.stroke();
-                    for (var trail = 0; trail < 16; trail++) {
-                        var a = angle - trail * 0.05;
-                        c.fillStyle = root.css(ink, (trail ? 0.35 * (1 - trail / 16) : 0.95) * dim);
-                        c.beginPath(); c.arc(entry.x + Math.cos(a) * ring, entry.y + Math.sin(a) * ring * 0.82, trail ? 2.2 : 4.5, 0, Math.PI * 2); c.fill();
-                    }
-                    c.font = root.font(600, 10); c.textAlign = "center"; c.fillStyle = root.css(ink, dim);
-                    c.fillText(sub.name, entry.x + Math.cos(angle) * ring, entry.y + Math.sin(angle) * ring * 0.82 - 9);
-                });
-                // Core, rotating arcs and ripples. Waiting cores pulse harder.
-                var pulse = status === "waiting" ? 1 + 0.25 * Math.sin(t * 4) : 1 + 0.06 * Math.sin(t * 5);
-                var core = 16 * root.scale * pulse * (status === "idle" ? 0.7 : status === "thinking" ? 0.85 : 1);
-                var glow = c.createRadialGradient(entry.x, entry.y, 0, entry.x, entry.y, core * 2.6);
-                glow.addColorStop(0, root.css(root.light ? color : Qt.rgba(1, 1, 1, 1), 0.95 * dim));
-                glow.addColorStop(0.25, root.css(color, 0.95 * dim)); glow.addColorStop(0.6, root.css(color, 0.3 * dim));
-                glow.addColorStop(1, root.css(color, 0));
-                c.fillStyle = glow; c.beginPath(); c.arc(entry.x, entry.y, core * 2.6, 0, Math.PI * 2); c.fill();
-                c.lineWidth = 2;
-                [[30, 1.1, 1.6], [37, -0.7, 2.4], [44, 0.45, 0.9]].forEach(function(arc, index) {
-                    var start = t * arc[1] * (busy ? 1 : 0.3) + index, r = arc[0] * root.scale;
-                    c.strokeStyle = root.css(color, (0.7 - index * 0.18) * dim);
-                    c.beginPath(); c.arc(entry.x, entry.y, r, start, start + arc[2]); c.stroke();
-                    c.beginPath(); c.arc(entry.x, entry.y, r, start + Math.PI, start + Math.PI + arc[2] * 0.4); c.stroke();
-                });
-                if (status !== "idle") {
-                    var period = status === "waiting" ? 1.2 : 1.8;
-                    for (var ripple = 0; ripple < 2; ripple++) {
-                        var phase = (t / period + ripple * 0.5) % 1;
-                        c.strokeStyle = root.css(color, (1 - phase) * (status === "waiting" ? 0.7 : 0.3) * dim);
-                        c.lineWidth = status === "waiting" ? 3 : 1.5;
-                        c.beginPath(); c.arc(entry.x, entry.y, (28 + phase * (status === "waiting" ? 130 : 80)) * root.scale, 0, Math.PI * 2); c.stroke();
-                    }
-                }
-            });
-            c.globalCompositeOperation = "source-over";
-            // The scene edges glow red while any agent waits for input.
-            if (waiting) {
-                var red = root.palette.role("red"), band = Math.min(width, height) * 0.05, strength = 0.22 + 0.1 * Math.sin(t * 3);
-                [[0, 0, 0, band, 0, 0, width, band], [0, height, 0, height - band, 0, height - band, width, band],
-                 [0, 0, band, 0, 0, 0, band, height], [width, 0, width - band, 0, width - band, 0, band, height]].forEach(function(e) {
-                    var g = c.createLinearGradient(e[0], e[1], e[2], e[3]);
-                    g.addColorStop(0, root.css(red, strength)); g.addColorStop(1, root.css(red, 0));
-                    c.fillStyle = g; c.fillRect(e[4], e[5], e[6], e[7]);
-                });
             }
         }
     }
@@ -247,8 +220,9 @@ FocusScope {
         interval: 33
         repeat: true
         running: root.running
-        property double origin: Date.now()
-        onTriggered: { root.time = (Date.now() - origin) / 1000; motion.requestPaint(); }
+        property double origin: Date.now() - root.time * 1000
+        onRunningChanged: if (running) origin = Date.now() - root.time * 1000
+        onTriggered: root.time = (Date.now() - origin) / 1000
     }
     MouseArea {
         anchors.fill: parent
