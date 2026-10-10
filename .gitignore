@@ -1,3 +1,9 @@
 # symlink to the active Omarchy theme, created by bin/constellation-serve
 web/theme
 .DS_Store
+__pycache__/
+*.py[cod]
+
+# Local agent instructions
+/AGENTS.md
+/CLAUDE.md
