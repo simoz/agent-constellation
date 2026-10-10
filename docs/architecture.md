@@ -44,7 +44,11 @@ The UI requests snapshots over the collector's stdin
    transcript (`projects/*/<session>.jsonl`) and its subagent transcripts
    (`<session>/subagents/agent-*.jsonl`);
 3. reads Codex rollouts from today's and yesterday's
-   `~/.codex/sessions/YYYY/MM/DD/` folders that changed within the idle window;
+   `~/.codex/sessions/YYYY/MM/DD/` folders that changed within the idle window,
+   only while a `codex` process of the user runs: rollouts carry no process id
+   and an interrupted turn never records its completion. A rollout whose
+   `session_meta` names a `parent_thread_id` (a subagent such as the approval
+   guardian) is shown as a subagent of its parent, not as an agent;
 4. replies with per-agent status, current activity, file heat, subagents,
    token rate, a five-minute activity histogram and the last 40 tool calls.
 
@@ -60,7 +64,7 @@ before the snapshot replaces the previous one.
 | working | session record `busy`, a tool call in the last 20 s | `task_started` without a later completion |
 | thinking | session record `busy`, no recent tool call | `task_started`, no tool call in the last 20 s |
 | waiting | session record `waiting` (permission, input) | not recorded by Codex |
-| idle | session record `idle`; hidden after the idle window | after `task_complete` / `turn_aborted`, or 10 min without changes |
+| idle | session record `idle`; hidden after the idle window | after `task_complete` / `turn_aborted`, or 10 min without changes; hidden when no Codex process runs |
 
 ## Privacy
 

@@ -118,7 +118,8 @@ stored, and nothing is sent over the network.
 
 **Waiting** comes from Claude Code's own session records. Codex does not record
 approval prompts in its session files, so Codex agents show working, thinking
-or idle only. **Thinking** means the agent is busy without a tool call in the
+or idle only. Codex sessions are shown only while a Codex process runs, and
+Codex subagents such as the approval guardian appear under their parent session. **Thinking** means the agent is busy without a tool call in the
 last 20 seconds. Heat is relative to each agent's hottest file and fades with a
 five-minute half-life. The first time a long session is seen, only the last
 1 MiB of its transcript is read.

@@ -43,8 +43,10 @@ class CollectorTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def collector(self, sources=("claude", "codex"), idle=30):
-        return collect.Collector(self.claude, self.codex, set(sources), idle)
+    def collector(self, sources=("claude", "codex"), idle=30, codex_alive=True):
+        collector = collect.Collector(self.claude, self.codex, set(sources), idle)
+        collector.codex_alive = lambda: codex_alive
+        return collector
 
     def session(self, session_id="s1", status="busy", pid=None, start=None, **extra):
         pid = pid or os.getpid()
@@ -201,6 +203,33 @@ class CollectorTest(unittest.TestCase):
         with transcript.open("a") as handle:
             handle.write('{"type": "fragment"}\n{"type": "ok"}\n')
         self.assertEqual(tail.read(), [{"type": "ok"}])
+
+    def test_codex_rollouts_need_a_running_codex(self):
+        # A rollout interrupted mid-task keeps its last task_started after Codex exits.
+        self.append(self.codex / "sessions" / time.strftime("%Y/%m/%d") / "rollout-a.jsonl",
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
+        self.assertEqual(len(self.collector(("codex",)).snapshot("r")["agents"]), 1)
+        snapshot = self.collector(("codex",), codex_alive=False).snapshot("r")
+        self.assertEqual((snapshot["agents"], snapshot["sources"]["codex"]), ([], "ok"))
+
+    def test_codex_subagent_rollout_belongs_to_parent(self):
+        day = self.codex / "sessions" / time.strftime("%Y/%m/%d")
+        self.append(day / "rollout-t1-parent.jsonl",
+                    {"timestamp": iso(), "type": "session_meta", "payload": {"id": "p1", "cwd": PROJECT, "source": "cli"}},
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}})
+        self.append(day / "rollout-t2-guardian.jsonl",
+                    {"timestamp": iso(), "type": "session_meta", "payload": {
+                        "id": "g1", "parent_thread_id": "p1", "source": {"subagent": {"other": "guardian"}}}},
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_started"}},
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "item_completed", "item": {
+                        "type": "CommandExecution", "command": ["/bin/bash", "-lc", "git diff"], "parsed_cmd": []}}},
+                    {"timestamp": iso(), "type": "event_msg", "payload": {"type": "task_complete"}})
+        snapshot = self.collector(("codex",)).snapshot("r")
+        self.assertEqual([a["id"] for a in snapshot["agents"]], ["codex:t1-parent"])
+        agent = snapshot["agents"][0]
+        self.assertEqual(agent["status"], "working")
+        self.assertEqual(agent["subagents"], [{"id": "t2-guardian", "name": "guardian", "type": "guardian"}])
+        self.assertEqual((agent["activity"]["tool"], agent["activity"]["target"], agent["activity"]["subagent"]), ("shell", "git", "guardian"))
 
     def test_disabled_sources(self):
         self.session()

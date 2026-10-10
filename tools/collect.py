@@ -39,6 +39,8 @@ READ_LIMIT = 4 << 20
 MAX_PARTIAL = 1 << 20
 # Session records and subagent metadata are small JSON files.
 MAX_RECORD = 64 << 10
+# The first line of a Codex rollout (session_meta, with the base instructions).
+MAX_META = 256 << 10
 # Activity windows, in seconds.
 WORKING_WINDOW = 20
 SUBAGENT_WINDOW = 15
@@ -84,6 +86,23 @@ def search_target(pattern) -> str:
     ):
         return "[redacted]"
     return clip(text, 48)
+
+
+def codex_running() -> bool:
+    """Whether the user runs any Codex process; rollouts outlive the sessions that wrote them."""
+    uid = os.getuid()
+    for entry in os.scandir("/proc"):
+        if not entry.name.isdigit():
+            continue
+        try:
+            if entry.stat().st_uid != uid:
+                continue
+            with open(f"/proc/{entry.name}/comm", "rb") as handle:
+                if handle.read().strip() == b"codex":
+                    return True
+        except OSError:
+            continue
+    return False
 
 
 def read_json(path: Path):
@@ -293,6 +312,8 @@ class Collector:
         self.session = secrets.token_hex(8)
         self.sequence = 0
         self.skipped = 0
+        self.codex_metas: dict[Path, dict] = {}
+        self.codex_alive = codex_running
 
     def safely(self, handler, *args) -> None:
         """Run one record or entry handler; input of an unexpected shape is skipped, not fatal."""
@@ -431,6 +452,10 @@ class Collector:
         root = self.codex_dir / "sessions"
         if not root.is_dir():
             return "missing"
+        if not self.codex_alive():
+            return "ok"
+        threads: dict[str, Agent] = {}
+        children = []
         days = {time.strftime("%Y/%m/%d", time.localtime(at_ms / 1000 - offset)) for offset in (0, 86400)}
         for day in sorted(days):
             for path in sorted((root / day).glob("rollout-*.jsonl"))[-64:]:
@@ -445,8 +470,15 @@ class Collector:
                 ident = "codex:" + stem
                 if at_ms - modified > self.idle_ms and ident not in self.agents:
                     continue
+                meta = self.codex_meta(path)
+                if meta.get("parent"):
+                    # Subagents such as the approval guardian belong to their parent thread.
+                    children.append((path, stem, modified, meta))
+                    continue
                 agent = self.agents.get(ident) or Agent(ident, "codex", "")
                 self.agents[ident] = agent
+                if meta.get("thread"):
+                    threads[meta["thread"]] = agent
                 for entry in agent.tail(path).read():
                     self.safely(self.codex_entry, agent, entry)
                 working_stale = agent.status == "working" and at_ms - modified > CODEX_STALE_WORKING * 1000
@@ -455,14 +487,69 @@ class Collector:
                 if agent.status == "idle" and at_ms - modified > self.idle_ms:
                     continue
                 seen.add(ident)
+        for path, stem, modified, meta in children:
+            agent = threads.get(meta["parent"])
+            if agent is not None and agent.id in seen:
+                self.safely(self.codex_subagent, agent, path, stem, modified, meta["name"], at_ms)
+        if len(self.codex_metas) > 512:
+            self.codex_metas.clear()
         return "ok"
 
-    def codex_entry(self, agent: Agent, entry: dict) -> None:
+    def codex_meta(self, path: Path) -> dict:
+        """Thread id, parent thread id and subagent name from the rollout's first line."""
+        if path in self.codex_metas:
+            return self.codex_metas[path]
+        try:
+            with path.open("rb") as handle:
+                line = handle.readline(MAX_META)
+        except OSError:
+            return {}
+        try:
+            entry = json.loads(line)
+        except (ValueError, RecursionError):
+            entry = None
+        payload = entry.get("payload") if isinstance(entry, dict) and entry.get("type") == "session_meta" else None
+        meta = {}
+        if isinstance(payload, dict):
+            source = payload.get("source")
+            role = source.get("subagent") if isinstance(source, dict) else None
+            if isinstance(role, dict):
+                role = next((v for v in role.values() if isinstance(v, str)), next(iter(role), None))
+            parent = payload.get("parent_thread_id")
+            meta = {"thread": str(payload.get("id") or ""),
+                    "parent": parent if isinstance(parent, str) and role else "",
+                    "name": str(role or "agent")}
+        # A first line still being written is read again next time.
+        if line.endswith(b"\n"):
+            self.codex_metas[path] = meta
+        return meta
+
+    def codex_subagent(self, agent: Agent, path: Path, key: str, modified: int, name: str, at_ms: int) -> None:
+        if key not in agent.subagents and at_ms - modified > SUBAGENT_WINDOW * 1000:
+            return
+        sub = agent.subagents.get(key)
+        if sub is None:
+            sub = agent.subagents[key] = {"name": name, "type": name, "startedMs": modified, "lastMs": modified}
+        sub["lastMs"] = modified
+        for entry in agent.tail(path).read():
+            self.safely(self.codex_entry, agent, entry, sub["name"])
+
+    def codex_entry(self, agent: Agent, entry: dict, subagent: str = "") -> None:
         payload = entry.get("payload")
         if not isinstance(payload, dict):
             return
         at_ms = parse_ms(entry.get("timestamp")) or now_ms()
         kind, event = entry.get("type"), payload.get("type")
+        if subagent:
+            # A subagent's tool calls and tokens count for its parent; its turns and settings do not.
+            if kind == "event_msg" and event == "item_completed" and isinstance(payload.get("item"), dict):
+                self.codex_item(agent, at_ms, payload["item"], subagent)
+            elif kind == "event_msg" and event == "token_count":
+                info = payload.get("info")
+                last = info.get("last_token_usage") if isinstance(info, dict) else None
+                if isinstance(last, dict):
+                    agent.tokens(at_ms, last.get("output_tokens"))
+            return
         if kind in ("session_meta", "turn_context") and payload.get("cwd"):
             agent.cwd = str(payload["cwd"])
         if kind == "turn_context" and isinstance(payload.get("model"), str):
@@ -485,7 +572,7 @@ class Collector:
         elif event == "item_completed" and isinstance(payload.get("item"), dict):
             self.codex_item(agent, at_ms, payload["item"])
 
-    def codex_item(self, agent: Agent, at_ms: int, item: dict) -> None:
+    def codex_item(self, agent: Agent, at_ms: int, item: dict, subagent: str = "") -> None:
         kind = item.get("type")
         if kind == "CommandExecution":
             parsed = [p for p in item.get("parsed_cmd") or [] if isinstance(p, dict)]
@@ -493,12 +580,12 @@ class Collector:
             if reads:
                 for part in reads:
                     target = display_path(part["path"], agent.cwd, self.home)
-                    agent.touch(at_ms, target, False)
-                    agent.call(at_ms, "read", target, self.events)
+                    agent.touch(at_ms, target, False, subagent=subagent)
+                    agent.call(at_ms, "read", target, self.events, subagent)
             elif parsed and parsed[0].get("type") in ("search", "list_files"):
-                agent.call(at_ms, str(parsed[0]["type"]).replace("_", " "), search_target(parsed[0].get("query")), self.events)
+                agent.call(at_ms, str(parsed[0]["type"]).replace("_", " "), search_target(parsed[0].get("query")), self.events, subagent)
             else:
-                agent.call(at_ms, "shell", program_name(item.get("command")), self.events)
+                agent.call(at_ms, "shell", program_name(item.get("command")), self.events, subagent)
         elif kind == "FileChange" and isinstance(item.get("changes"), dict):
             for path, change in list(item["changes"].items())[:32]:
                 diff = str(change.get("unified_diff") or "") if isinstance(change, dict) else ""
@@ -506,10 +593,10 @@ class Collector:
                 added = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
                 removed = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
                 target = display_path(path, agent.cwd, self.home)
-                agent.touch(at_ms, target, True, added, removed)
-                agent.call(at_ms, "apply_patch", target, self.events)
+                agent.touch(at_ms, target, True, added, removed, subagent)
+                agent.call(at_ms, "apply_patch", target, self.events, subagent)
         elif kind == "ImageView" and item.get("path"):
-            agent.call(at_ms, "view_image", display_path(item["path"], agent.cwd, self.home), self.events)
+            agent.call(at_ms, "view_image", display_path(item["path"], agent.cwd, self.home), self.events, subagent)
 
     # Snapshot --------------------------------------------------------------
 
