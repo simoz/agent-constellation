@@ -42,6 +42,10 @@ FocusScope {
     readonly property string paintKey: JSON.stringify(service.snapshot ? service.snapshot.sequence : 0) + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
+    // Delegates being removed when the scene shrinks still evaluate their bindings
+    // once; they see this inert entry instead of undefined.
+    readonly property var vacant: ({agent: {id: "", status: "idle", activityBuckets: [], subagents: []},
+                                    files: [], x: 0, y: 0, radius: 1, color: "transparent"})
 
     function css(c, a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + (a === undefined ? c.a : a) + ")"; }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
@@ -188,12 +192,12 @@ FocusScope {
             model: root.scene.length
             AgentMotion {
                 required property int index
-                entry: root.scene[index]
+                entry: root.scene[index] || root.vacant
                 colors: root.colors
                 scale: root.scale
                 fontFamily: root.fontFamily
                 time: root.time
-                opacity: entry && root.dimmed(entry) ? 0.3 : 1
+                opacity: root.dimmed(entry) ? 0.3 : 1
             }
         }
     }

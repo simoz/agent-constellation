@@ -70,6 +70,22 @@ removes its files. `demo/live --no-window` only plays the sessions and prints
 their directories: point the installed plugin's Settings at them to record the
 bar and panel, and restore the defaults afterwards.
 
+## Launch video
+
+```bash
+DEMO_AUDIO=demo/constellation.mp3 DEMO_AUDIO_START=<seconds> demo/video demo/constellation-launch.mp4
+```
+
+`demo/video` renders `demo/Launch.qml` offscreen, frame by frame, in Outbound's
+launch format: 1440×1440, 30 fps, 28.8 s (12 bars at 100 BPM), cuts and kinetic
+type on the beat, the drop at 2.4 s. Frames render slower than real time, so the
+scene replays snapshots that `demo/video_data.py` computes beforehand with the
+real collector on the fictional sessions of `demo/scenario.py` and a simulated
+clock. `DEMO_AUDIO_START` is the drop's time in the track minus 2.4 s; the audio
+fades out over the last 1.7 s. `DEMO_STEP=36 DEMO_STILLS=<dir>` keeps every
+36th frame as PNG for a quick look. Videos and tracks in `demo/` are ignored by
+Git. A full render takes about six minutes on the test VM.
+
 ## Visual checks and screenshots
 
 `demo/run` renders stills offscreen from the fictional sessions written by

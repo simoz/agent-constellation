@@ -33,7 +33,8 @@ Item {
             readonly property var node: root.entry.files[Math.floor(Model.unit(key + "n") * Math.min(root.entry.files.length, 6))]
             x: -root.x; y: -root.y
             startX: root.entry.x; startY: root.entry.y
-            endX: node.x; endY: node.y
+            // Particles being removed may outlive their file node for one evaluation.
+            endX: node ? node.x : root.entry.x; endY: node ? node.y : root.entry.y
             bend: (Model.unit(key + "c") - 0.5) * root.entry.radius * 0.6
             speed: (0.25 + Model.unit(key + "s") * 0.35) * (root.agent.status === "thinking" ? 0.5 : 1)
             phase: Model.unit(key + "p")

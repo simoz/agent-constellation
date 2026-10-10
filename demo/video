@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Render the Constellation launch video (demo/Launch.qml) from fictional Rails
+# sessions: 1440×1440, 30 fps, 28.8 s, the same format as Outbound's.
+# Isolated: temp Quickshell config and XDG dirs, offscreen rendering; it never
+# reads real agent sessions or changes the bar.
+# Usage: demo/video [OUTPUT.mp4]
+#   DEMO_AUDIO=track.mp3 DEMO_AUDIO_START=<seconds>  soundtrack, cut so its drop lands at 2.4 s
+#   DEMO_STEP=N  render every Nth frame;  DEMO_STILLS=DIR  keep the frames as PNGs instead
+set -euo pipefail
+
+repository="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+output="${1:-$repository/demo/constellation-launch.mp4}"
+for command in qs ffmpeg python3; do
+  command -v "$command" >/dev/null || { printf 'Missing %s\n' "$command" >&2; exit 1; }
+done
+
+work="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/constellation-video.XXXXXX")"
+trap '[[ -n "${DEMO_KEEP:-}" ]] || rm -rf -- "$work"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+mkdir -p "$work/shell/plugin/tools" "$work/frames" "$work/config" "$work/data"
+cp "$repository"/*.qml "$repository"/*.js "$work/shell/plugin/"
+cp -r "$repository/ui" "$work/shell/plugin/"
+cp -r /usr/share/omarchy/shell/Commons /usr/share/omarchy/shell/Ui "$work/shell/"
+cp "$repository/demo/Launch.qml" "$work/shell/shell.qml"
+python3 -B "$repository/demo/video_data.py" "$work/snapshots.json" --seconds 64 >/dev/null
+
+export DEMO_SNAPSHOTS="$work/snapshots.json" DEMO_FRAMES="$work/frames" DEMO_FPS="${DEMO_FPS:-30}"
+export XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data"
+# UTC keeps the capture machine's time zone out of the footer timestamp.
+export TZ=UTC
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" QT_SCALE_FACTOR="${DEMO_SCALE:-2}" QT_QPA_PLATFORMTHEME=basic
+
+qs -p "$work/shell" 2>&1 | grep -E "DEMO_COMPLETE|ERROR|Error|error" || true
+if [[ -n "${DEMO_STILLS:-}" ]]; then
+  mkdir -p "$DEMO_STILLS"
+  compgen -G "$work/frames/*.png" >/dev/null || { printf 'No frames rendered\n' >&2; exit 1; }
+  cp "$work/frames"/*.png "$DEMO_STILLS/"
+  printf 'Frames → %s\n' "$DEMO_STILLS"; exit 0
+fi
+count=$(find "$work/frames" -name 'f*.png' | wc -l)
+(( count > 0 )) || { printf 'No frames rendered\n' >&2; exit 1; }
+ffmpeg -loglevel error -y -framerate "$DEMO_FPS" -pattern_type glob -i "$work/frames/f*.png" \
+  -vf "scale=1440:1440:flags=lanczos,format=yuv420p" -c:v libx264 -preset slow -crf 18 \
+  -movflags +faststart -an "$work/video.mp4"
+# DEMO_AUDIO adds a soundtrack from DEMO_AUDIO_START, faded out over the last 1.7 s.
+if [[ -n "${DEMO_AUDIO:-}" ]]; then
+  length=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$work/video.mp4")
+  ffmpeg -loglevel error -y -i "$work/video.mp4" -ss "${DEMO_AUDIO_START:-0}" -i "$DEMO_AUDIO" -map 0:v -map 1:a -c:v copy \
+    -af "afade=t=in:d=0.05,afade=t=out:st=$(python3 -c "print(max(0, $length - 1.7))"):d=1.7" \
+    -c:a aac -b:a 192k -shortest -movflags +faststart "$output"
+else
+  mv "$work/video.mp4" "$output"
+fi
+printf 'Rendered %s frames → %s\n' "$count" "$output"

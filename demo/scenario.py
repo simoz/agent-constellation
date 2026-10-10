@@ -27,6 +27,8 @@ def append(path, entry):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as handle:
         handle.write(json.dumps(entry) + "\n")
+    # Explicit mtimes keep a simulated clock (demo/video_data.py) consistent.
+    os.utime(path, (time.time(), time.time()))
 
 
 class Claude:
@@ -91,7 +93,7 @@ class Codex:
         self.event("event_msg", {"type": "thread_settings_applied", "thread_settings": {"model": "gpt-5-codex"}})
 
     def event(self, kind, payload):
-        append(self.rollout, {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime()), "type": kind, "payload": payload})
+        append(self.rollout, {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(time.time())), "type": kind, "payload": payload})
 
     def item(self, item, tokens=500):
         self.event("event_msg", {"type": "item_completed", "item": item})
