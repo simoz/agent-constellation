@@ -73,6 +73,7 @@ For a single capture of your real sessions, inspect it before sharing:
 preview=$(python3 -B tools/prepare_preview.py)
 QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORMTHEME=basic \
   CONSTELLATION_THEME=light CONSTELLATION_CAPTURE=/tmp/constellation.png qs -p "$preview"
+rm -rf -- "$preview"
 ```
 
 Controls: `CONSTELLATION_THEME` (`light`/`dark`, otherwise the installed

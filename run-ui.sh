@@ -12,4 +12,8 @@ if (( $# )); then
   exit 2
 fi
 constellation_preview=$(python3 -B "$repository_dir/tools/prepare_preview.py")
-exec qs -p "$constellation_preview"
+# The preview is a fresh temporary copy; remove it when the window closes.
+trap 'rm -rf -- "$constellation_preview"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+qs -p "$constellation_preview"

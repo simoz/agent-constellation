@@ -9,7 +9,8 @@ mkdir -p "$output"
 work=$(mktemp -d /tmp/constellation-demo.XXXXXX)
 # Fixture sessions are visible only while their process is alive.
 sleep 600 & holder=$!
-trap 'kill "$holder" 2>/dev/null || true; rm -rf "$work"' EXIT
+preview=
+trap 'kill "$holder" 2>/dev/null || true; rm -rf -- "$work" ${preview:+"$preview"}' EXIT
 preview=$(python3 -B "$repository_dir/tools/prepare_preview.py")
 theme_file() {
   mkdir -p "$work/state/omarchy/current/theme"

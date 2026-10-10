@@ -20,7 +20,7 @@ were reproduced, not inferred.
 | L4 | Low | Partial lines are retained per file, up to 4 MiB each | Fixed |
 | I1 | Info | `python3` is resolved through `PATH` | Accepted |
 | I2 | Info | Snapshot data is reachable by other plugins in the shared scene | Accepted |
-| I3 | Info | Preview directories under `/tmp` are never removed | Open |
+| I3 | Info | Preview directories under `/tmp` are never removed | Fixed |
 | I4 | Info | Symbolic links to transcripts are followed | Accepted |
 
 ## Threat model
@@ -205,9 +205,13 @@ the collector. Accepted, and noted in the threat model.
 
 `tools/prepare_preview.py` creates a new `constellation-preview-*` directory on
 each run (mode 0700, via `mkdtemp`) and nothing deletes it. Harmless, but it
-accumulates. `demo/run` cleans up its own work directory.
+accumulates. `demo/run` cleans up its own work directory, but not the preview.
 
 **Fix**: let `run-ui.sh` remove the directory on exit with a `trap`.
+
+**Status**: fixed. `run-ui.sh` and `demo/run` remove the preview directory on
+exit, including after Ctrl+C; `docs/development.md` removes it after a single
+capture.
 
 ### I4 — Symbolic links to transcripts are followed
 
@@ -251,7 +255,7 @@ for session records.
 3. Decide how much of search patterns to show (L3) and document it.
 4. Tighten L4 and I3 when convenient.
 
-All of these are done except I3, which remains open.
+All of these are done.
 
 ## Reproduction
 
