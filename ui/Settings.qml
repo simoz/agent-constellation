@@ -13,6 +13,7 @@ C.Popup {
     property bool claude: true
     property bool codex: true
     property bool notify: true
+    property bool backdrop: false
     onSectionChanged: scroll.contentY = 0
     width: Math.min(560, parent.width - 24)
     height: Math.min(parent.height - 24, 620)
@@ -23,7 +24,7 @@ C.Popup {
     closePolicy: C.Popup.CloseOnEscape | C.Popup.CloseOnPressOutside
     Theme { id: theme }
     onAboutToShow: {
-        claude = service.claudeEnabled; codex = service.codexEnabled; notify = service.notifyWaiting;
+        claude = service.claudeEnabled; codex = service.codexEnabled; notify = service.notifyWaiting; backdrop = service.backdropEnabled;
         claudeDir.text = service.claudeDir; codexDir.text = service.codexDir;
         interval.text = String(service.intervalSeconds); idle.text = String(service.idleMinutes);
         validationError = ""; scroll.contentY = 0;
@@ -119,6 +120,16 @@ C.Popup {
                         onClicked: root.notify = !root.notify
                     }
                     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "The notification offers Go to terminal. It needs the bar icon, which keeps checking sessions every 5 seconds."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
+                    ActionButton {
+                        objectName: "backdropToggle"
+                        Layout.fillWidth: true
+                        Layout.topMargin: 8
+                        text: (root.backdrop ? "■ " : "□ ") + "Show on the desktop"
+                        hint: "Draw the constellation over the wallpaper, below windows"
+                        selected: root.backdrop
+                        onClicked: root.backdrop = !root.backdrop
+                    }
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Ignores the pointer and refreshes at the interval above. It moves only while an agent is busy or waiting."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
                 }
                 ColumnLayout {
                     visible: root.section === 2
@@ -143,7 +154,7 @@ C.Popup {
         ActionButton {
             objectName: "applySettings"; Layout.fillWidth: true; text: "Done"
             onClicked: {
-                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify);
+                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop);
                 if (root.validationError === "") root.close();
             }
         }

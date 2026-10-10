@@ -72,7 +72,9 @@ Open settings with the gear button:
 - **Collection**: refresh interval, how long idle sessions stay visible, pause
   and retry, and a desktop notification when an agent starts waiting for input
   (on by default), whose **Go to terminal** action focuses that agent's
-  terminal.
+  terminal, and **Show on the desktop** (off by default): the constellation
+  over the wallpaper and below windows on every screen, ignoring the pointer
+  and moving only while an agent is busy or waiting.
 - **About**: what is read and shown.
 
 **Done** saves the changes. Invalid values keep the editor open. **Esc** or

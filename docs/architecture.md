@@ -26,6 +26,13 @@ collector reads local agent session files; nothing else runs outside the shell.
   With the timer, an open window renders about 33 frames per second and costs
   about 11% of a core on the test VM with the three demo agents, 5% zoomed on
   one agent and 2% with the animation paused (offscreen preview, October 2026).
+- `Backdrop.qml`, loaded by the service when Settings enable it, shows a
+  backdrop `Constellation` on every screen in a layer-shell window on the
+  `Bottom` layer (above Omarchy's `Background` wallpaper layer, below windows):
+  transparent, click-through (`mask: Region {}`), without keyboard focus. It
+  registers as an open view, so it refreshes at the configured interval, and it
+  animates only while an agent is busy or waiting. On the test VM it added about
+  2% of a core while covered by windows; an uncovered desktop costs more.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.
@@ -88,7 +95,8 @@ nothing and makes no network requests. Snapshots stay in memory.
 - Per-instance state: bar icon per monitor. Process-wide state: snapshot,
   selection, color roles, animation and pause in `Service.qml`.
 - Durable state: inline plugin configuration in `shell.json` (sources, session
-  directories, interval, idle window, waiting notifications), written by
+  directories, interval, idle window, waiting notifications, desktop backdrop),
+  written by
   Settings → Done.
 - External commands: `python3` running `tools/collect.py`; `hyprctl clients -j`
   and `hyprctl dispatch hl.dsp.focus(...)` to go to an agent's terminal;
@@ -104,7 +112,7 @@ nothing and makes no network requests. Snapshots stay in memory.
 - Prior art (October 2026): `omarchy.agents` shows usage and limits; "Agent
   Sessions" lists live session status; "Agent Activity Visualization" charts
   history. None draws live tool activity per file.
-- Deferred: Hyprland background-layer mode, Codex approval detection, and the other agents Omarchy offers (pi,
+- Deferred: Codex approval detection, and the other agents Omarchy offers (pi,
   omp, opencode, crush, grok, gemini, openclaw, hermes, copilot, cursor-agent,
   muse). Each needs real sessions to verify its format, so it waits until one
   is in use; presence from running processes (project from the working

@@ -35,6 +35,7 @@ ShellRoot {
             }
             if (Quickshell.env("CONSTELLATION_CLAUDE_DIR")) config.claudeDir = Quickshell.env("CONSTELLATION_CLAUDE_DIR");
             if (Quickshell.env("CONSTELLATION_CODEX_DIR")) config.codexDir = Quickshell.env("CONSTELLATION_CODEX_DIR");
+            if (Quickshell.env("CONSTELLATION_BACKDROP") === "1") config.backdrop = true;
             loadConfiguration(config);
         }
     }

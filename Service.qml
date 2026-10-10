@@ -17,6 +17,7 @@ Item {
     property int intervalSeconds: 1
     property int idleMinutes: 30
     property bool notifyWaiting: true
+    property bool backdropEnabled: false
     property var savedConfiguration: ({})
     property var snapshot: null
     property string phase: "idle"
@@ -47,6 +48,12 @@ Item {
         onLoaded: item.service = root
     }
     readonly property var collector: transport.item
+    // The constellation on the desktop, when enabled in Settings.
+    Loader {
+        active: root.backdropEnabled && (root.shell !== null || root.standalone)
+        source: "Backdrop.qml"
+        onLoaded: item.service = root
+    }
     readonly property bool refreshing: collector ? collector.refreshing : false
     function refresh() { if (collector) collector.refresh(); }
     function retry() { if (collector) collector.retry(); }
@@ -58,13 +65,13 @@ Item {
     }
     function removeView(token) { views = views.filter(function(v) { return v.token !== token; }); }
 
-    function configure(claude, codex, claudePath, codexPath, interval, idle, notify) {
+    function configure(claude, codex, claudePath, codexPath, interval, idle, notify, backdrop) {
         var seconds = Number(interval), minutes = Number(idle);
         if (!validPath(claudePath) || !validPath(codexPath) || /[\x00-\x1f]/.test(claudePath + codexPath)) return "Use absolute directory paths.";
         if (!validInterval(seconds)) return "Refresh interval must be 1–10 seconds.";
         if (!validIdle(minutes)) return "Idle sessions must be hidden after 1–1440 minutes.";
         var config = Object.assign({}, savedConfiguration, {sources: {claude: claude, codex: codex}, claudeDir: claudePath,
-            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false});
+            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false, backdrop: backdrop === true});
         // updateEntryInline returns whether shell.json changed, not whether saving
         // failed: an entry that is already up to date also returns false.
         if (shell) shell.updateEntryInline("io.github.simoz.agent-constellation", config);
@@ -82,6 +89,7 @@ Item {
         intervalSeconds = validInterval(config.intervalSeconds) ? config.intervalSeconds : 1;
         idleMinutes = validIdle(config.idleMinutes) ? config.idleMinutes : 30;
         notifyWaiting = config.notifyWaiting !== false;
+        backdropEnabled = config.backdrop === true;
     }
     // Empty paths select the defaults (CLAUDE_CONFIG_DIR / CODEX_HOME, then ~/.claude and ~/.codex).
     function validPath(path) { return !path || (path[0] === "/" && path.length <= 4096); }

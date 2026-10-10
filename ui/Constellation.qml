@@ -11,6 +11,8 @@ FocusScope {
     objectName: "constellationScene"
     required property var service
     property bool active: true
+    // On the desktop: no background of its own, no focus, no pointer input.
+    property bool backdrop: false
     property int paintCount: 0
     readonly property var colors: service.colors
     readonly property bool light: colors.light
@@ -75,7 +77,7 @@ FocusScope {
         service.selection = agents[index].id;
     }
 
-    activeFocusOnTab: true
+    activeFocusOnTab: !backdrop
     Accessible.role: Accessible.Graphic
     Accessible.name: service.zooming ? "Zoomed on " + Model.agentTitle(service.selected) + ". Escape shows all agents."
         : service.agents.length ? service.agents.length + " agents in the constellation. Arrow keys select an agent, Enter zooms." : "No active agents"
@@ -98,16 +100,18 @@ FocusScope {
             root.paintCount++;
             var c = getContext("2d"), w = width, h = height, fg = theme.text, bg = theme.background;
             c.reset();
-            var vignette = c.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, Math.max(w, h) * 0.75);
-            vignette.addColorStop(0, root.css(bg, 1));
-            vignette.addColorStop(1, root.css(root.colors.mix(bg, root.light ? Qt.rgba(1, 1, 1, 1) : Qt.rgba(0, 0, 0, 1), 0.3), 1));
-            c.fillStyle = vignette; c.fillRect(0, 0, w, h);
-            // Grid dots and fixed stars, seeded so they never jump between repaints.
-            c.fillStyle = root.css(fg, 0.04);
-            for (var gx = 20; gx < w; gx += 40) for (var gy = 20; gy < h; gy += 40) c.fillRect(gx, gy, 1.5, 1.5);
-            for (var i = 0; i < 160; i++) {
-                var sx = Model.unit("x" + i) * w, sy = Model.unit("y" + i) * h, size = Model.unit("s" + i) * 1.4 + 0.6;
-                c.fillStyle = root.css(fg, 0.06 + Model.unit("a" + i) * 0.14); c.fillRect(sx, sy, size, size);
+            if (!root.backdrop) {
+                var vignette = c.createRadialGradient(w / 2, h / 2, 40, w / 2, h / 2, Math.max(w, h) * 0.75);
+                vignette.addColorStop(0, root.css(bg, 1));
+                vignette.addColorStop(1, root.css(root.colors.mix(bg, root.light ? Qt.rgba(1, 1, 1, 1) : Qt.rgba(0, 0, 0, 1), 0.3), 1));
+                c.fillStyle = vignette; c.fillRect(0, 0, w, h);
+                // Grid dots and fixed stars, seeded so they never jump between repaints.
+                c.fillStyle = root.css(fg, 0.04);
+                for (var gx = 20; gx < w; gx += 40) for (var gy = 20; gy < h; gy += 40) c.fillRect(gx, gy, 1.5, 1.5);
+                for (var i = 0; i < 160; i++) {
+                    var sx = Model.unit("x" + i) * w, sy = Model.unit("y" + i) * h, size = Model.unit("s" + i) * 1.4 + 0.6;
+                    c.fillStyle = root.css(fg, 0.06 + Model.unit("a" + i) * 0.14); c.fillRect(sx, sy, size, size);
+                }
             }
             var entries = root.scene;
             if (entries.length > 1) {
@@ -243,6 +247,7 @@ FocusScope {
     }
     MouseArea {
         anchors.fill: parent
+        enabled: !root.backdrop
         onClicked: function(mouse) {
             root.forceActiveFocus();
             var id = root.agentAt(mouse.x, mouse.y);
@@ -257,7 +262,7 @@ FocusScope {
         anchors.centerIn: parent
         width: Math.min(parent.width - 48, 460)
         spacing: 8
-        visible: root.service.agents.length === 0
+        visible: !root.backdrop && root.service.agents.length === 0
         Label {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
