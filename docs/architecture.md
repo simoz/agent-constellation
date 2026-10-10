@@ -99,6 +99,10 @@ nothing and makes no network requests. Snapshots stay in memory.
 - Prior art (October 2026): `omarchy.agents` shows usage and limits; "Agent
   Sessions" lists live session status; "Agent Activity Visualization" charts
   history. None draws live tool activity per file.
-- Deferred: Hyprland background-layer mode, focusing an agent's terminal,
-  desktop notifications for waiting agents, Codex approval detection, other
-  agents (opencode, pi).
+- Deferred: Hyprland background-layer mode, desktop notifications for waiting
+  agents, Codex approval detection, and the other agents Omarchy offers (pi,
+  omp, opencode, crush, grok, gemini, openclaw, hermes, copilot, cursor-agent,
+  muse). Each needs real sessions to verify its format, so it waits until one
+  is in use; presence from running processes (project from the working
+  directory, terminal from the process ancestry) would come first, then a
+  per-agent transcript parser.
