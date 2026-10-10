@@ -5,7 +5,8 @@ Watch your coding agents work.
 Agent Constellation is an Omarchy plugin that shows the Claude Code and Codex
 sessions running on your machine as a live constellation. Every agent is a
 glowing core. Its subagents orbit around it, each tool call flies out to the
-file it touches, and the files touched most often heat up. When an agent is
+file it touches, and the files touched most often heat up. Along the bottom,
+one wave per agent rises and falls with the tokens it writes. When an agent is
 waiting for your input, its core turns red and pulses, and the bar icon turns
 red too.
 

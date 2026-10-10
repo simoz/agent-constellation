@@ -18,7 +18,8 @@ collector reads local agent session files; nothing else runs outside the shell.
 - `ui/Constellation.qml` draws static geometry and labels on one canvas,
   repainted only when data, size, selection or theme change. Moving parts
   (`ui/AgentMotion.qml`, `ui/Particle.qml`: particles, subagent orbits, core
-  pulses, ripples, waiting edges) are scene-graph items whose positions derive
+  pulses, ripples, waiting edges; `ui/TokenWaves.qml`: one periodic wave strip
+  per agent, drawn once per snapshot and slid along) are scene-graph items whose positions derive
   from one scene clock ticking at 30 fps, only while the view is visible and
   animation is on. A full-window canvas repainted every frame cost about a third
   of a core inside the shell; vsync-driven animations still rendered at 60 fps.

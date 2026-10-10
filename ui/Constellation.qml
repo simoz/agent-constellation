@@ -193,6 +193,17 @@ FocusScope {
             }
         }
     }
+    TokenWaves {
+        objectName: "tokenWaves"
+        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 14 }
+        width: Math.min(parent.width * 0.6, 820 * root.scale)
+        height: 72 * root.scale
+        entries: root.scene
+        colors: root.colors
+        time: root.time
+        scale: root.scale
+        fontFamily: root.fontFamily
+    }
     // The scene edges glow red while any agent waits for input.
     Item {
         id: waitingEdges
