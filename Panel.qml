@@ -12,6 +12,9 @@ UI.Panel {
     property Item anchorItem: null
     property var hostWidget: null
     property bool expanded: false
+    // The dashboard loads on first open, then stays to keep its state.
+    property bool used: false
+    onOpenedChanged: if (opened) used = true
     readonly property Item scene: dashboard.item as Item
 
     function close() {
@@ -68,7 +71,7 @@ UI.Panel {
         id: dashboard
         parent: root.expanded ? expandedWindow.contentItem : compactHost
         anchors.fill: parent
-        active: root.service !== null
+        active: root.service !== null && (root.used || root.opened)
         sourceComponent: Constellation.Dashboard {
             service: root.service
             active: root.opened
