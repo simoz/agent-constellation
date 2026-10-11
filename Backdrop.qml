@@ -32,6 +32,8 @@ Item {
                 service: root.service
                 backdrop: true
                 active: root.lively
+                // Slow drift on the desktop: half the panel's frame rate.
+                frameInterval: 66
                 opacity: 0.9
             }
         }
