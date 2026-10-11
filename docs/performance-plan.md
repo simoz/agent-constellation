@@ -42,24 +42,22 @@ The demo agents change activity about every second, so the canvas still
 repaints often there; an idle backdrop now stays unpainted. Item 4 needs a check
 in the real bar while an agent waits.
 
-## Later, medium priority
+Later items, also done:
 
-- **Backdrop:** run at 15 fps instead of 30. Add an option for the main screen
-  only (each screen runs a full scene today). Note that the backdrop registers
-  as an open view, which keeps polling at 1 s.
-- **Expanded window on another workspace:** the scene clock keeps running and
-  evaluating bindings. Pause it when `frameSwapped` stops arriving, and resume
-  on the next frame.
-- **`Panel.qml` loads a Dashboard per bar and monitor at startup** and keeps it
-  reacting to snapshots. Load it on first open instead.
-- **Collector cleanups (small gains):**
-  - Cache each agent's transcript path. Today `projects/*/<id>.jsonl` is globbed
-    every tick: 136 µs with 39 projects, against 1.6 µs to stat a known path.
-  - Skip lines without `"assistant"` before `json.loads`. This cut parsing of the
-    five largest local transcripts from 18 to 8 ms.
-- **Possible correctness bug:** subagent transcripts are sliced `[-32:]` by name,
-  not by recency. If agent ids are random, new subagents can be missed in
-  sessions with more than 32 of them. Sort by mtime.
+- Scene clock pauses after a second without `frameSwapped` and resumes on the
+  next frame. Preview moved to a hidden workspace: 2.9% → 0.3%.
+- Desktop backdrop at 15 fps. Preview hidden, backdrop drawing: 14.1% → 6.9%.
+- `Panel.qml` loads its Dashboard on first open (not verified in the real bar).
+- Collector: transcript path cached, Claude lines without `"assistant"` skipped
+  before `json.loads`, subagent transcripts kept by mtime instead of by name
+  (names are slugs plus hashes, so new subagents could be missed).
+
+## Open
+
+- **Backdrop on the main screen only:** each screen runs a full scene. Needs a
+  setting and a rule for which screen is the main one.
+- **Backdrop polling:** it registers as an open view, which keeps polling at the
+  configured interval (1 s by default) instead of the 5 s watch.
 
 ## Keep
 
