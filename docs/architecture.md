@@ -45,7 +45,8 @@ collector reads local agent session files; nothing else runs outside the shell.
   background, whichever theme ink stands out more there, shades colors with
   too little contrast toward that ink, and sets its labels on a soft glow of the
   opposite ink (a canvas shadow cast from text drawn off the canvas, so the
-  glyphs keep their color).
+  glyphs keep their color). Desktop text is 15% larger than in the panel
+  (`textScale`), since it is read from further away.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

@@ -11,6 +11,7 @@ Item {
     required property var entry
     required property var colors
     required property real scale
+    property real textScale: 1
     required property string fontFamily
     required property real time
     readonly property var agent: entry.agent
@@ -81,7 +82,7 @@ Item {
                 textFormat: Text.PlainText
                 color: orbit.ink
                 font.family: root.fontFamily
-                font.pixelSize: Math.round(10 * root.scale)
+                font.pixelSize: Math.round(10 * root.scale * root.textScale)
                 font.weight: Font.DemiBold
             }
         }

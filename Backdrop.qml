@@ -68,6 +68,7 @@ Item {
                 anchors.margins: 56
                 service: root.service
                 backdrop: true
+                textScale: 1.15
                 surface: probe.values.length ? probe : null
                 active: root.lively
                 // Slow drift on the desktop: half the panel's frame rate.

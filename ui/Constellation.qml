@@ -15,6 +15,8 @@ FocusScope {
     property bool backdrop: false
     // On the desktop: the wallpaper's luminance grid (WallpaperProbe), or null.
     property var surface: null
+    // Text size relative to the panel's; the desktop reads from further away.
+    property real textScale: 1
     property int paintCount: 0
     readonly property var colors: service.colors
     readonly property bool light: colors.light
@@ -80,7 +82,7 @@ FocusScope {
     function ink(entry) { return entry.light === light ? theme.text : theme.background; }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
     function zoomTo(id) { service.selection = id; service.zoomed = true; }
-    function font(weight, size) { return weight + " " + Math.round(size * scale) + "px \"" + fontFamily + "\""; }
+    function font(weight, size) { return weight + " " + Math.round(size * scale * textScale) + "px \"" + fontFamily + "\""; }
     function dashed(c, x1, y1, x2, y2, dash, gap) {
         var length = Math.hypot(x2 - x1, y2 - y1), step = dash + gap;
         for (var d = 0; d < length; d += step) {
@@ -210,10 +212,10 @@ FocusScope {
                 };
                 entry.files.forEach(function(node) {
                     c.font = root.font(400, 11); c.fillStyle = root.css(text, (root.backdrop ? 0.65 + node.heat * 0.35 : 0.35 + node.heat * 0.55) * dim);
-                    label(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 + node.heat * 5);
+                    label(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 * root.textScale + node.heat * 5);
                     if ((node.file.added || node.file.removed) && (node.heat > 0.25 || root.service.zooming)) {
                         c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.standOut(root.colors.role("green"), entry.surface, entry.light), 0.8 * dim);
-                        label("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
+                        label("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 * root.textScale + node.heat * 5);
                     }
                 });
                 var y = entry.y + 70 * root.scale;
@@ -221,7 +223,7 @@ FocusScope {
                 label(Model.agentTitle(agent).toUpperCase(), entry.x, y);
                 c.font = root.font(400, 12); c.fillStyle = root.css(text, (root.backdrop ? 0.9 : 0.72) * dim);
                 label(agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
-                    : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · "), entry.x, y + 19 * root.scale);
+                    : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · "), entry.x, y + 19 * root.scale * root.textScale);
             });
         }
     }
@@ -240,6 +242,7 @@ FocusScope {
                 entry: root.scene[index] || root.vacant
                 colors: root.colors
                 scale: root.scale
+                textScale: root.textScale
                 fontFamily: root.fontFamily
                 time: root.time
                 particleLimit: root.particleLimit
@@ -257,6 +260,7 @@ FocusScope {
         light: root.wavesLight
         time: root.time
         scale: root.scale
+        textScale: root.textScale
         fontFamily: root.fontFamily
     }
     // The scene edges glow red while any agent waits for input.

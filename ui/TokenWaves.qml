@@ -13,6 +13,7 @@ Item {
     property bool light: colors.light
     property real time: 0
     property real scale: 1
+    property real textScale: 1
     property string fontFamily: ""
     readonly property real period: 360
     readonly property int peak: Math.max(1500, Math.max.apply(null, entries.map(function(e) { return e.agent.tokensPerMinute; }).concat([0])))
@@ -25,7 +26,7 @@ Item {
         color: root.light === root.colors.light ? theme.text : theme.background
         opacity: 0.4
         font.family: root.fontFamily
-        font.pixelSize: Math.round(10 * root.scale)
+        font.pixelSize: Math.round(10 * root.scale * root.textScale)
         font.letterSpacing: 1
     }
     Item {
