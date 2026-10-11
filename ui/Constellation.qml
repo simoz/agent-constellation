@@ -42,6 +42,8 @@ FocusScope {
     readonly property string paintKey: Model.sceneKey(scene) + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
+    // Particles in flight across all agents; each agent gets an equal share, at most 12.
+    readonly property int particleLimit: Math.max(2, Math.min(12, Math.floor(48 / Math.max(1, scene.length))))
     // Delegates being removed when the scene shrinks still evaluate their bindings
     // once; they see this inert entry instead of undefined.
     readonly property var vacant: ({agent: {id: "", status: "idle", activityBuckets: [], subagents: []},
@@ -197,6 +199,7 @@ FocusScope {
                 scale: root.scale
                 fontFamily: root.fontFamily
                 time: root.time
+                particleLimit: root.particleLimit
                 opacity: root.dimmed(entry) ? 0.3 : 1
             }
         }
