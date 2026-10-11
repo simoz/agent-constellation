@@ -18,14 +18,20 @@ Item {
     function luminance(c) { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
     function mix(a, b, k) { return Qt.rgba(a.r * (1 - k) + b.r * k, a.g * (1 - k) + b.g * k, a.b * (1 - k) + b.b * k, 1); }
     function fade(c, opacity) { return Qt.rgba(c.r, c.g, c.b, c.a * opacity); }
+    // WCAG relative luminance: linear light, which contrast ratios assume.
+    function linear(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+    function relative(c) { return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b); }
     function contrast(a, b) { return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); }
-    // A theme color on a surface of luminance l, as the desktop backdrop over a
-    // wallpaper: the color itself when it stands out, otherwise its darker or
-    // lighter shade. A negative l means the theme's own background.
-    function standOut(c, l) {
-        if (l < 0 || contrast(luminance(c), l) >= 3) return c;
-        var dark = mix(c, Qt.rgba(0, 0, 0, 1), 0.5), bright = mix(c, Qt.rgba(1, 1, 1, 1), 0.5);
-        return contrast(luminance(dark), l) > contrast(luminance(bright), l) ? dark : bright;
+    // A theme color on a surface of relative luminance l, as the desktop backdrop
+    // over a wallpaper: the color itself when it stands out, otherwise shaded
+    // toward black where the scene draws as on a light surface (light) or toward
+    // white, so it agrees with the labels' ink and glow. A negative l means the
+    // theme's own background.
+    function standOut(c, l, light) {
+        if (l < 0) return c;
+        var target = light ? Qt.rgba(0, 0, 0, 1) : Qt.rgba(1, 1, 1, 1), shaded = c;
+        for (var k = 0.35; contrast(relative(shaded), l) < 3 && k < 0.9; k += 0.2) shaded = mix(c, target, k);
+        return shaded;
     }
     // Older themes ship only color0–color15: map them to the same role names.
     readonly property var ansi: ({red: "color1", green: "color2", yellow: "color3", blue: "color4", magenta: "color5", cyan: "color6"})

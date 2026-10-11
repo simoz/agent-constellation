@@ -45,9 +45,9 @@ FocusScope {
         var grid = surface ? {columns: surface.columns, rows: surface.rows, values: surface.values} : null;
         return agents.map(function(agent, index) {
             var x = mx + list[index].x * (width - mx * 2), y = my + list[index].y * (height - my * 2);
-            var behind = surfaceAt(grid, x, y, radius, radius * 0.8);
-            return {agent: agent, x: x, y: y, radius: radius, surface: behind, light: surfaceLight(behind),
-                    color: colors.standOut(service.agentColor(agent), behind),
+            var behind = surfaceAt(grid, x, y, radius, radius * 0.8), lit = surfaceLight(behind);
+            return {agent: agent, x: x, y: y, radius: radius, surface: behind, light: lit,
+                    color: colors.standOut(service.agentColor(agent), behind, lit),
                     files: Model.fileNodes(agent, x, y, radius)};
         });
     }
@@ -73,7 +73,7 @@ FocusScope {
     // on the desktop whichever theme ink stands out more on luminance l.
     function surfaceLight(l) {
         if (l < 0) return light;
-        var a = colors.luminance(theme.text), b = colors.luminance(theme.background);
+        var a = colors.relative(theme.text), b = colors.relative(theme.background);
         return Model.lightSurface(l, Math.min(a, b), Math.max(a, b));
     }
     // Text ink for an entry: the theme's text, or its background where that stands out more.
@@ -169,7 +169,7 @@ FocusScope {
                     edge.addColorStop(0, root.css(color, 0.25 * dim));
                     edge.addColorStop(1, root.css(color, (0.04 + node.heat * 0.16) * dim));
                     c.strokeStyle = edge; c.lineWidth = 1; c.beginPath(); c.moveTo(entry.x, entry.y); c.lineTo(node.x, node.y); c.stroke();
-                    var hot = node.heat > 0.6 ? root.colors.standOut(root.colors.role("orange"), entry.surface) : color, glow = 8 + node.heat * 26;
+                    var hot = node.heat > 0.6 ? root.colors.standOut(root.colors.role("orange"), entry.surface, entry.light) : color, glow = 8 + node.heat * 26;
                     var g = c.createRadialGradient(node.x, node.y, 0, node.x, node.y, glow);
                     g.addColorStop(0, root.css(hot, (0.2 + node.heat * 0.45) * dim)); g.addColorStop(1, root.css(hot, 0));
                     c.fillStyle = g; c.beginPath(); c.arc(node.x, node.y, glow, 0, Math.PI * 2); c.fill();
@@ -181,7 +181,7 @@ FocusScope {
                 var dim = root.dimmed(entry) ? 0.3 : 1;
                 c.globalCompositeOperation = entry.light ? "source-over" : "lighter";
                 entry.agent.subagents.forEach(function(sub, index) {
-                    var ring = (52 + index * 18) * root.scale, ink = root.colors.standOut(root.colors.role(Model.subagentRole(index)), entry.surface);
+                    var ring = (52 + index * 18) * root.scale, ink = root.colors.standOut(root.colors.role(Model.subagentRole(index)), entry.surface, entry.light);
                     c.strokeStyle = root.css(ink, 0.25 * dim); c.lineWidth = 1; c.beginPath();
                     for (var d = 0; d < Math.PI * 2; d += 0.16) {
                         c.moveTo(entry.x + Math.cos(d) * ring, entry.y + Math.sin(d) * ring * 0.82);
@@ -194,24 +194,32 @@ FocusScope {
             c.textAlign = "center";
             entries.forEach(function(entry) {
                 var dim = root.dimmed(entry) ? 0.35 : 1, agent = entry.agent, text = root.ink(entry);
-                // On the desktop a thin outline of the opposite ink keeps labels apart from a busy wallpaper.
-                var halo = root.css(entry.light === root.light ? theme.background : theme.text, 0.75 * dim);
+                // On the desktop a soft glow of the opposite ink lifts labels off a busy
+                // wallpaper. The glow is a shadow cast from text drawn off the canvas, so
+                // it never tints the glyphs; labels are also less faded there.
+                var halo = root.css(entry.light === root.light ? theme.background : theme.text, 0.9 * dim);
                 var label = function(value, x, y) {
-                    if (root.backdrop) { c.strokeStyle = halo; c.lineWidth = 3; c.lineJoin = "round"; c.strokeText(value, x, y); }
+                    if (root.backdrop) {
+                        var fill = c.fillStyle, away = w + 1000;
+                        c.fillStyle = halo; c.strokeStyle = halo; c.lineWidth = 4 * root.scale; c.lineJoin = "round";
+                        c.shadowColor = halo; c.shadowBlur = 6 * root.scale; c.shadowOffsetX = away;
+                        c.strokeText(value, x - away, y); c.fillText(value, x - away, y);
+                        c.shadowBlur = 0; c.shadowOffsetX = 0; c.shadowColor = "transparent"; c.fillStyle = fill;
+                    }
                     c.fillText(value, x, y);
                 };
                 entry.files.forEach(function(node) {
-                    c.font = root.font(400, 11); c.fillStyle = root.css(text, (0.35 + node.heat * 0.55) * dim);
+                    c.font = root.font(400, 11); c.fillStyle = root.css(text, (root.backdrop ? 0.65 + node.heat * 0.35 : 0.35 + node.heat * 0.55) * dim);
                     label(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 + node.heat * 5);
                     if ((node.file.added || node.file.removed) && (node.heat > 0.25 || root.service.zooming)) {
-                        c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.standOut(root.colors.role("green"), entry.surface), 0.8 * dim);
+                        c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.standOut(root.colors.role("green"), entry.surface, entry.light), 0.8 * dim);
                         label("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
                     }
                 });
                 var y = entry.y + 70 * root.scale;
                 c.font = root.font(800, 16); c.fillStyle = root.css(entry.color, dim);
                 label(Model.agentTitle(agent).toUpperCase(), entry.x, y);
-                c.font = root.font(400, 12); c.fillStyle = root.css(text, 0.72 * dim);
+                c.font = root.font(400, 12); c.fillStyle = root.css(text, (root.backdrop ? 0.9 : 0.72) * dim);
                 label(agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
                     : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · "), entry.x, y + 19 * root.scale);
             });

@@ -13,7 +13,7 @@ Canvas {
     property rect area: Qt.rect(0, 0, screenWidth, screenHeight)
     readonly property int columns: 32
     readonly property int rows: Math.max(1, Math.round(columns * area.height / Math.max(1, area.width)))
-    // Row-major luminance, 0–1; empty until the wallpaper is sampled.
+    // Row-major relative (linear) luminance, 0–1; empty until the wallpaper is sampled.
     property var values: []
     property string loaded: ""
     width: columns
@@ -54,8 +54,9 @@ Canvas {
         var ox = (screenWidth - iw * scale) / 2, oy = (screenHeight - ih * scale) / 2;
         c.drawImage(loaded, (ox - area.x) * kx, (oy - area.y) * ky, iw * scale * kx, ih * scale * ky);
         var data = c.getImageData(0, 0, columns, rows).data, list = [];
+        var linear = function(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
         for (var i = 0; i < columns * rows; i++)
-            list.push((0.2126 * data[i * 4] + 0.7152 * data[i * 4 + 1] + 0.0722 * data[i * 4 + 2]) / 255);
+            list.push(0.2126 * linear(data[i * 4]) + 0.7152 * linear(data[i * 4 + 1]) + 0.0722 * linear(data[i * 4 + 2]));
         values = list;
         unloadImage(loaded);
     }
