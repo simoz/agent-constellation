@@ -54,8 +54,9 @@ Later items, also done:
 
 ## Open
 
-- **Backdrop on the main screen only:** each screen runs a full scene. Needs a
-  setting and a rule for which screen is the main one.
+- **Backdrop on fewer screens:** Settings can limit the backdrop to some
+  workspaces, which hides it elsewhere; each screen showing it still runs a
+  full scene.
 - **Backdrop polling:** it registers as an open view, which keeps polling at the
   configured interval (1 s by default) instead of the 5 s watch.
 

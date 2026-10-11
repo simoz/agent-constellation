@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Window
 import QtQuick.Controls.Basic as C
 import QtQuick.Layouts
+import "../Model.js" as Model
 
 C.Popup {
     id: root
@@ -27,6 +28,7 @@ C.Popup {
         claude = service.claudeEnabled; codex = service.codexEnabled; notify = service.notifyWaiting; backdrop = service.backdropEnabled;
         claudeDir.text = service.claudeDir; codexDir.text = service.codexDir;
         interval.text = String(service.intervalSeconds); idle.text = String(service.idleMinutes);
+        workspaces.text = Model.formatWorkspaces(service.backdropWorkspaces);
         validationError = ""; scroll.contentY = 0;
     }
     background: Rectangle { color: theme.background; Frame { anchors.fill: parent; emphasized: true } }
@@ -130,6 +132,15 @@ C.Popup {
                         onClicked: root.backdrop = !root.backdrop
                     }
                     Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "Ignores the pointer and refreshes at the interval above. It moves only while an agent is busy or waiting."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
+                    Label { text: "Desktop workspaces" }
+                    SearchField {
+                        id: workspaces
+                        objectName: "workspacesField"
+                        Layout.fillWidth: true
+                        enabled: root.backdrop
+                        placeholderText: "All workspaces, or 3, 1-5, 1, 3, 5"
+                        Accessible.name: "Workspaces that show the constellation on the desktop"
+                    }
                 }
                 ColumnLayout {
                     visible: root.section === 2
@@ -154,7 +165,7 @@ C.Popup {
         ActionButton {
             objectName: "applySettings"; Layout.fillWidth: true; text: "Done"
             onClicked: {
-                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop);
+                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop, workspaces.text.trim());
                 if (root.validationError === "") root.close();
             }
         }

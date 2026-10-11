@@ -154,3 +154,32 @@ function summary(agents) {
     return {agents: agents.length, waiting: waiting, busy: busy, subagents: subagents, tokensPerMinute: rate,
             toolCalls: agents.reduce(function(n, a) { return n + a.toolCalls; }, 0)};
 }
+
+// Workspaces that show the desktop backdrop, written as "3", "1-5" or "1, 3, 5".
+// An empty list means every workspace; null marks invalid text.
+function parseWorkspaces(text) {
+    var result = [], parts = String(text).split(",").map(function(p) { return p.trim(); });
+    if (parts.length === 1 && parts[0] === "") return [];
+    for (var i = 0; i < parts.length; i++) {
+        var match = /^(\d{1,2})(?:\s*-\s*(\d{1,2}))?$/.exec(parts[i]);
+        if (!match) return null;
+        var first = Number(match[1]), last = match[2] === undefined ? first : Number(match[2]);
+        if (first < 1 || last < first) return null;
+        for (var n = first; n <= last; n++) if (result.indexOf(n) < 0) result.push(n);
+    }
+    return result.sort(function(a, b) { return a - b; });
+}
+function validWorkspaces(list) {
+    return Array.isArray(list) && list.length <= 99
+        && list.every(function(n, i) { return Number.isInteger(n) && n >= 1 && n <= 99 && (i === 0 || n > list[i - 1]); });
+}
+function formatWorkspaces(list) {
+    var parts = [];
+    for (var i = 0; i < list.length; i++) {
+        var start = list[i];
+        while (i + 1 < list.length && list[i + 1] === list[i] + 1) i++;
+        parts.push(list[i] > start + 1 ? start + "-" + list[i] : list[i] > start ? start + ", " + list[i] : String(start));
+    }
+    return parts.join(", ");
+}
+function showsOnWorkspace(list, id) { return list.length === 0 || list.indexOf(id) >= 0; }
