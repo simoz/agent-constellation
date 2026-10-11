@@ -17,7 +17,14 @@ FocusScope {
     readonly property var colors: service.colors
     readonly property bool light: colors.light
     property real time: 0
-    readonly property bool running: active && visible && service.moving && width > 0 && height > 0
+    // Milliseconds between clock ticks; the desktop backdrop runs slower.
+    property int frameInterval: 33
+    // False while the window shows no frames, as on another workspace: the clock
+    // stops instead of evaluating bindings nobody sees. The next frame, which any
+    // snapshot change brings, starts it again.
+    property bool presented: true
+    property double lastFrame: 0
+    readonly property bool running: active && visible && presented && service.moving && width > 0 && height > 0
     readonly property string fontFamily: theme.font
     readonly property real scale: Math.max(0.75, Math.min(1.25, Math.min(width, height) / 760))
     Theme { id: theme }
@@ -244,13 +251,24 @@ FocusScope {
             }
         }
     }
+    Connections {
+        target: root.Window.window
+        function onFrameSwapped() {
+            root.lastFrame = Date.now();
+            root.presented = true;
+        }
+    }
     Timer {
-        interval: 33
+        interval: root.frameInterval
         repeat: true
         running: root.running
         property double origin: Date.now() - root.time * 1000
-        onRunningChanged: if (running) origin = Date.now() - root.time * 1000
-        onTriggered: root.time = (Date.now() - origin) / 1000
+        onRunningChanged: if (running) { origin = Date.now() - root.time * 1000; root.lastFrame = Date.now(); }
+        onTriggered: {
+            var now = Date.now();
+            if (now - root.lastFrame > 1000) { root.presented = false; return; }
+            root.time = (now - origin) / 1000;
+        }
     }
     MouseArea {
         anchors.fill: parent

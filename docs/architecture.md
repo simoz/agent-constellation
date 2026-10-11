@@ -10,7 +10,8 @@ collector reads local agent session files; nothing else runs outside the shell.
 - `BarWidget.qml` registers the host view, draws the bar icon (one dot per
   agent, red while an agent waits for input) and opens `Panel.qml`.
 - `Panel.qml` keeps one `Dashboard` scene when switching between the compact
-  panel and the expanded window, preserving selection and focus.
+  panel and the expanded window, preserving selection and focus. The scene
+  loads on the first open, not at startup on every bar.
 - `Service.qml` owns settings, the latest snapshot, agent color roles,
   selection and animation state across views.
 - `Collector.qml` owns the single collector process, snapshot requests, bounded
@@ -21,7 +22,8 @@ collector reads local agent session files; nothing else runs outside the shell.
   pulses, ripples, waiting edges; `ui/TokenWaves.qml`: one periodic wave strip
   per agent, drawn once per snapshot and slid along) are scene-graph items whose positions derive
   from one scene clock ticking at 30 fps, only while the view is visible and
-  animation is on. A full-window canvas repainted every frame cost about a third
+  animation is on. The clock also stops when the window has presented no frame
+  for a second, as on another workspace, and restarts on its next frame. A full-window canvas repainted every frame cost about a third
   of a core inside the shell; vsync-driven animations still rendered at 60 fps.
   With the timer, an open window renders about 33 frames per second and costs
   about 11% of a core on the test VM with the three demo agents, 5% zoomed on
@@ -31,7 +33,7 @@ collector reads local agent session files; nothing else runs outside the shell.
   `Bottom` layer (above Omarchy's `Background` wallpaper layer, below windows):
   transparent, click-through (`mask: Region {}`), without keyboard focus. It
   registers as an open view, so it refreshes at the configured interval, and it
-  animates only while an agent is busy or waiting. On the test VM it added about
+  animates at 15 fps only while an agent is busy or waiting. On the test VM it added about
   2% of a core while covered by windows; an uncovered desktop costs more.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
