@@ -47,3 +47,14 @@ test('labels', () => {
     assert.equal(model.activityText({tool: 'Read', target: 'a.rb', subagent: 'Explore'}), 'Explore ▸ Read a.rb');
     assert.equal(model.summary([{status: 'waiting', subagents: [1], tokensPerMinute: 5, toolCalls: 2}]).waiting, 1);
 });
+test('the scene key ignores sub-pixel motion and small heat changes', () => {
+    const agent = {id: 'a', status: 'working', kind: 'Claude Code', project: 'shop', model: 'opus', subagents: [],
+                   activity: {tool: 'Read', target: 'a.rb'}};
+    const entry = (x, heat, added) => ({agent, x, y: 50, radius: 100, color: '#7aa2f7',
+        files: [{path: 'a.rb', x: x + 40, y: 60, heat, file: {added, removed: 0}}]});
+    const key = model.sceneKey([entry(10, 0.5, 1)]);
+    assert.equal(model.sceneKey([entry(10.2, 0.51, 1)]), key);
+    assert.notEqual(model.sceneKey([entry(11, 0.5, 1)]), key);
+    assert.notEqual(model.sceneKey([entry(10, 0.6, 1)]), key);
+    assert.notEqual(model.sceneKey([entry(10, 0.5, 2)]), key);
+});

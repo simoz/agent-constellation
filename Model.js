@@ -89,6 +89,20 @@ function fileNodes(agent, x, y, radius) {
     });
 }
 
+// What the static canvas draws, so it repaints only when this changes: snapshots
+// arrive every second even when nothing visible moved. Whole pixels and heat in
+// 0.05 steps keep slow heat decay from repainting on every snapshot.
+function sceneKey(entries) {
+    return JSON.stringify(entries.map(function(entry) {
+        var agent = entry.agent;
+        return [agent.id, agent.status, agent.model, agent.waitingFor, agentTitle(agent), activityText(agent.activity),
+                agent.subagents.length, String(entry.color), Math.round(entry.x), Math.round(entry.y), Math.round(entry.radius),
+                entry.files.map(function(node) {
+                    return [node.path, Math.round(node.x), Math.round(node.y), Math.round(node.heat * 20), node.file.added, node.file.removed];
+                })];
+    }));
+}
+
 // Agents waiting now that were not waiting in the previous snapshot. The first
 // snapshot (previous === null) reports none, so a restart does not replay alerts.
 function newlyWaiting(previous, agents) {
