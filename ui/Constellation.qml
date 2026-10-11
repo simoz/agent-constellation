@@ -127,6 +127,20 @@ FocusScope {
                 }
             }
             var entries = root.scene;
+            if (root.backdrop) {
+                // The wallpaper can be any color: a soft veil of the theme background
+                // behind each agent and the token waves keeps the theme's ink readable.
+                var veil = function(x, y, rx, ry) {
+                    c.save(); c.translate(x, y); c.scale(1, ry / rx);
+                    var g = c.createRadialGradient(0, 0, 0, 0, 0, rx);
+                    g.addColorStop(0, root.css(bg, 0.88)); g.addColorStop(0.5, root.css(bg, 0.72)); g.addColorStop(1, root.css(bg, 0));
+                    c.fillStyle = g; c.fillRect(-rx, -rx, rx * 2, rx * 2);
+                    c.restore();
+                };
+                entries.forEach(function(entry) { veil(entry.x, entry.y + entry.radius * 0.08, entry.radius * 1.75, entry.radius * 1.55); });
+                // Ends at the canvas edge, which sits above the screen edge.
+                if (entries.length) veil(w / 2, h - 60 * root.scale, Math.min(w * 0.45, 620 * root.scale), 60 * root.scale);
+            }
             if (entries.length > 1) {
                 c.strokeStyle = root.css(fg, 0.08); c.lineWidth = 1; c.beginPath();
                 for (var k = 0; k < entries.length; k++) {
