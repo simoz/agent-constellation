@@ -45,10 +45,7 @@ collector reads local agent session files; nothing else runs outside the shell.
   background, whichever theme ink stands out more there, shades colors with
   too little contrast toward that ink, and sets its labels on a soft glow of the
   opposite ink (a canvas shadow cast from text drawn off the canvas, so the
-  glyphs keep their color). The **Desktop background** setting
-  (`backdropBackground`, 0–100) draws the theme background at that opacity
-  behind the scene's bounds on the static canvas, feathered by nested rounded
-  rectangles, and blends its luminance into the surface the inks are chosen for.
+  glyphs keep their color).
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

@@ -20,8 +20,6 @@ Item {
     property bool backdropEnabled: false
     // Workspace ids that show the backdrop; empty means every workspace.
     property var backdropWorkspaces: []
-    // Opacity, 0–100, of the theme background behind the desktop constellation.
-    property int backdropBackground: 0
     property var savedConfiguration: ({})
     property var snapshot: null
     property string phase: "idle"
@@ -69,16 +67,15 @@ Item {
     }
     function removeView(token) { views = views.filter(function(v) { return v.token !== token; }); }
 
-    function configure(claude, codex, claudePath, codexPath, interval, idle, notify, backdrop, workspaces, background) {
+    function configure(claude, codex, claudePath, codexPath, interval, idle, notify, backdrop, workspaces) {
         var seconds = Number(interval), minutes = Number(idle), desktops = Model.parseWorkspaces(workspaces || "");
         if (!validPath(claudePath) || !validPath(codexPath) || /[\x00-\x1f]/.test(claudePath + codexPath)) return "Use absolute directory paths.";
         if (!validInterval(seconds)) return "Refresh interval must be 1–10 seconds.";
         if (!validIdle(minutes)) return "Idle sessions must be hidden after 1–1440 minutes.";
         if (desktops === null) return "Workspaces must be numbers 1–99, such as 3, 1-5 or 1, 3, 5.";
-        if (!validBackground(background)) return "Desktop background must be 0–100%.";
         var config = Object.assign({}, savedConfiguration, {sources: {claude: claude, codex: codex}, claudeDir: claudePath,
             codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false, backdrop: backdrop === true,
-            backdropWorkspaces: desktops, backdropBackground: background});
+            backdropWorkspaces: desktops});
         // updateEntryInline returns whether shell.json changed, not whether saving
         // failed: an entry that is already up to date also returns false.
         if (shell) shell.updateEntryInline("io.github.simoz.agent-constellation", config);
@@ -98,13 +95,11 @@ Item {
         notifyWaiting = config.notifyWaiting !== false;
         backdropEnabled = config.backdrop === true;
         backdropWorkspaces = Model.validWorkspaces(config.backdropWorkspaces) ? config.backdropWorkspaces : [];
-        backdropBackground = validBackground(config.backdropBackground) ? config.backdropBackground : 0;
     }
     // Empty paths select the defaults (CLAUDE_CONFIG_DIR / CODEX_HOME, then ~/.claude and ~/.codex).
     function validPath(path) { return !path || (path[0] === "/" && path.length <= 4096); }
     function validInterval(seconds) { return Number.isInteger(seconds) && seconds >= 1 && seconds <= 10; }
     function validIdle(minutes) { return Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440; }
-    function validBackground(percent) { return Number.isInteger(percent) && percent >= 0 && percent <= 100; }
 
     property string selection: ""
     // Zoom shows only the selected agent; it ends with the selection.

@@ -77,9 +77,7 @@ Open settings with the gear button:
   and moving only while an agent is busy or waiting. Text and colors turn
   darker or lighter to follow the wallpaper behind each agent. **Desktop workspaces**
   limits it to some workspaces, such as `3`, `1-5` or `1, 3, 5`; empty shows it
-  on all of them. **Desktop background** (0–100%, arrow keys move it by 5%)
-  sets the theme background behind the constellation, feathered into the
-  wallpaper; at 0% text and colors follow the wallpaper alone.
+  on all of them.
 - **About**: what is read and shown.
 
 **Done** saves the changes. Invalid values keep the editor open. **Esc** or

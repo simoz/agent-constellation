@@ -68,7 +68,6 @@ Item {
                 anchors.margins: 56
                 service: root.service
                 backdrop: true
-                veil: root.service ? root.service.backdropBackground / 100 : 0
                 surface: probe.values.length ? probe : null
                 active: root.lively
                 // Slow drift on the desktop: half the panel's frame rate.
