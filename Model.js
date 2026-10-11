@@ -183,3 +183,20 @@ function formatWorkspaces(list) {
     return parts.join(", ");
 }
 function showsOnWorkspace(list, id) { return list.length === 0 || list.indexOf(id) >= 0; }
+
+// Wallpaper luminance (0–1) averaged over a box in 0–1 coordinates of a grid
+// {columns, rows, values}; -1 while no wallpaper has been sampled.
+function luminanceAt(grid, u, v, ru, rv) {
+    if (!grid || !grid.values || grid.values.length !== grid.columns * grid.rows) return -1;
+    var clamp = function(n, size) { return Math.max(0, Math.min(size - 1, n)); };
+    var c0 = clamp(Math.floor((u - ru) * grid.columns), grid.columns), c1 = clamp(Math.floor((u + ru) * grid.columns), grid.columns);
+    var r0 = clamp(Math.floor((v - rv) * grid.rows), grid.rows), r1 = clamp(Math.floor((v + rv) * grid.rows), grid.rows);
+    var sum = 0;
+    for (var r = r0; r <= r1; r++) for (var c = c0; c <= c1; c++) sum += grid.values[r * grid.columns + c];
+    return sum / ((r1 - r0 + 1) * (c1 - c0 + 1));
+}
+// True when the darker of two inks stands out more on the surface, so the
+// scene should draw as on a light background.
+function lightSurface(surface, dark, light) {
+    return (surface + 0.05) / (dark + 0.05) > (light + 0.05) / (surface + 0.05);
+}

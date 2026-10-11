@@ -9,6 +9,8 @@ Item {
     id: root
     required property var entries
     required property var colors
+    // Drawn as on a light background; on the desktop this follows the wallpaper.
+    property bool light: colors.light
     property real time: 0
     property real scale: 1
     property string fontFamily: ""
@@ -20,7 +22,7 @@ Item {
         id: caption
         text: "TOKENS / MIN · " + Model.tokens(root.entries.reduce(function(sum, e) { return sum + e.agent.tokensPerMinute; }, 0))
         textFormat: Text.PlainText
-        color: theme.text
+        color: root.light === root.colors.light ? theme.text : theme.background
         opacity: 0.4
         font.family: root.fontFamily
         font.pixelSize: Math.round(10 * root.scale)
@@ -47,7 +49,7 @@ Item {
                 // Slide by whole periods' remainder so the strip loops seamlessly.
                 x: -((root.time * speed + index * 61) % root.period)
                 renderStrategy: Canvas.Cooperative
-                readonly property string paintKey: amplitude.toFixed(2) + String(ink) + width + "x" + height + root.colors.light
+                readonly property string paintKey: amplitude.toFixed(2) + String(ink) + width + "x" + height + root.light
                 onPaintKeyChanged: requestPaint()
                 onPaint: {
                     var c = getContext("2d");
@@ -55,7 +57,7 @@ Item {
                     if (!agent) return;
                     var css = function(a) { return "rgba(" + Math.round(ink.r * 255) + "," + Math.round(ink.g * 255) + "," + Math.round(ink.b * 255) + "," + a + ")"; };
                     var base = height - 2, amp = (height - 6) * amplitude / 1.4, phase = index * 1.7;
-                    c.globalCompositeOperation = root.colors.light ? "source-over" : "lighter";
+                    c.globalCompositeOperation = root.light ? "source-over" : "lighter";
                     c.beginPath();
                     for (var px = 0; px <= width; px += 3) {
                         // Integer harmonics of the period keep the strip periodic.

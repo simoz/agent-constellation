@@ -13,6 +13,8 @@ FocusScope {
     property bool active: true
     // On the desktop: no background of its own, no focus, no pointer input.
     property bool backdrop: false
+    // On the desktop: the wallpaper's luminance grid (WallpaperProbe), or null.
+    property var surface: null
     property int paintCount: 0
     readonly property var colors: service.colors
     readonly property bool light: colors.light
@@ -40,23 +42,42 @@ FocusScope {
         var radius = Model.reach(agents.length, width, height);
         // Files spread wider than tall (orbits are flattened to 0.82), labels sit below the core.
         var mx = Math.min(radius * 1.05, width * 0.25), my = Math.min(radius * 0.8, height * 0.22);
+        var grid = surface ? {columns: surface.columns, rows: surface.rows, values: surface.values} : null;
         return agents.map(function(agent, index) {
             var x = mx + list[index].x * (width - mx * 2), y = my + list[index].y * (height - my * 2);
-            return {agent: agent, x: x, y: y, radius: radius, color: service.agentColor(agent),
+            var behind = surfaceAt(grid, x, y, radius, radius * 0.8);
+            return {agent: agent, x: x, y: y, radius: radius, surface: behind, light: surfaceLight(behind),
+                    color: colors.standOut(service.agentColor(agent), behind),
                     files: Model.fileNodes(agent, x, y, radius)};
         });
     }
-    readonly property string paintKey: Model.sceneKey(scene) + service.selection + service.zooming
+    // The token waves sit on the wallpaper too.
+    readonly property bool wavesLight: surfaceLight(surfaceAt(surface ? {columns: surface.columns, rows: surface.rows, values: surface.values} : null,
+        width / 2, height - 50 * scale, Math.min(width * 0.3, 410 * scale), 40 * scale))
+    readonly property string paintKey: Model.sceneKey(scene) + scene.map(function(e) { return e.light ? 1 : 0; }).join("") + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
     // Particles in flight across all agents; each agent gets an equal share, at most 12.
     readonly property int particleLimit: Math.max(2, Math.min(12, Math.floor(48 / Math.max(1, scene.length))))
     // Delegates being removed when the scene shrinks still evaluate their bindings
     // once; they see this inert entry instead of undefined.
-    readonly property var vacant: ({agent: {id: "", status: "idle", activityBuckets: [], subagents: []},
+    readonly property var vacant: ({agent: {id: "", status: "idle", activityBuckets: [], subagents: []}, surface: -1, light: false,
                                     files: [], x: 0, y: 0, radius: 1, color: "transparent"})
 
     function css(c, a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + (a === undefined ? c.a : a) + ")"; }
+    // Wallpaper luminance around a point, or -1 off the desktop.
+    function surfaceAt(grid, x, y, rx, ry) {
+        return Model.luminanceAt(grid, x / Math.max(1, width), y / Math.max(1, height), rx / Math.max(1, width), ry / Math.max(1, height));
+    }
+    // Whether the scene draws as on a light background: the theme's own mode, or
+    // on the desktop whichever theme ink stands out more on luminance l.
+    function surfaceLight(l) {
+        if (l < 0) return light;
+        var a = colors.luminance(theme.text), b = colors.luminance(theme.background);
+        return Model.lightSurface(l, Math.min(a, b), Math.max(a, b));
+    }
+    // Text ink for an entry: the theme's text, or its background where that stands out more.
+    function ink(entry) { return entry.light === light ? theme.text : theme.background; }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
     function zoomTo(id) { service.selection = id; service.zoomed = true; }
     function font(weight, size) { return weight + " " + Math.round(size * scale) + "px \"" + fontFamily + "\""; }
@@ -127,20 +148,6 @@ FocusScope {
                 }
             }
             var entries = root.scene;
-            if (root.backdrop) {
-                // The wallpaper can be any color: a soft veil of the theme background
-                // behind each agent and the token waves keeps the theme's ink readable.
-                var veil = function(x, y, rx, ry) {
-                    c.save(); c.translate(x, y); c.scale(1, ry / rx);
-                    var g = c.createRadialGradient(0, 0, 0, 0, 0, rx);
-                    g.addColorStop(0, root.css(bg, 0.88)); g.addColorStop(0.5, root.css(bg, 0.72)); g.addColorStop(1, root.css(bg, 0));
-                    c.fillStyle = g; c.fillRect(-rx, -rx, rx * 2, rx * 2);
-                    c.restore();
-                };
-                entries.forEach(function(entry) { veil(entry.x, entry.y + entry.radius * 0.08, entry.radius * 1.75, entry.radius * 1.55); });
-                // Ends at the canvas edge, which sits above the screen edge.
-                if (entries.length) veil(w / 2, h - 60 * root.scale, Math.min(w * 0.45, 620 * root.scale), 60 * root.scale);
-            }
             if (entries.length > 1) {
                 c.strokeStyle = root.css(fg, 0.08); c.lineWidth = 1; c.beginPath();
                 for (var k = 0; k < entries.length; k++) {
@@ -150,9 +157,9 @@ FocusScope {
                 }
                 c.stroke();
             }
-            c.globalCompositeOperation = root.light ? "source-over" : "lighter";
             entries.forEach(function(entry) {
                 var dim = root.dimmed(entry) ? 0.3 : 1, color = entry.color;
+                c.globalCompositeOperation = entry.light ? "source-over" : "lighter";
                 var halo = c.createRadialGradient(entry.x, entry.y, 0, entry.x, entry.y, entry.radius * 1.3);
                 halo.addColorStop(0, root.css(color, 0.16 * dim * (entry.agent.status === "idle" ? 0.4 : 1)));
                 halo.addColorStop(1, root.css(color, 0));
@@ -162,7 +169,7 @@ FocusScope {
                     edge.addColorStop(0, root.css(color, 0.25 * dim));
                     edge.addColorStop(1, root.css(color, (0.04 + node.heat * 0.16) * dim));
                     c.strokeStyle = edge; c.lineWidth = 1; c.beginPath(); c.moveTo(entry.x, entry.y); c.lineTo(node.x, node.y); c.stroke();
-                    var hot = node.heat > 0.6 ? root.colors.role("orange") : color, glow = 8 + node.heat * 26;
+                    var hot = node.heat > 0.6 ? root.colors.standOut(root.colors.role("orange"), entry.surface) : color, glow = 8 + node.heat * 26;
                     var g = c.createRadialGradient(node.x, node.y, 0, node.x, node.y, glow);
                     g.addColorStop(0, root.css(hot, (0.2 + node.heat * 0.45) * dim)); g.addColorStop(1, root.css(hot, 0));
                     c.fillStyle = g; c.beginPath(); c.arc(node.x, node.y, glow, 0, Math.PI * 2); c.fill();
@@ -172,8 +179,9 @@ FocusScope {
             // Subagent orbits are static; the moving dots live in AgentMotion.
             entries.forEach(function(entry) {
                 var dim = root.dimmed(entry) ? 0.3 : 1;
+                c.globalCompositeOperation = entry.light ? "source-over" : "lighter";
                 entry.agent.subagents.forEach(function(sub, index) {
-                    var ring = (52 + index * 18) * root.scale, ink = root.colors.role(Model.subagentRole(index));
+                    var ring = (52 + index * 18) * root.scale, ink = root.colors.standOut(root.colors.role(Model.subagentRole(index)), entry.surface);
                     c.strokeStyle = root.css(ink, 0.25 * dim); c.lineWidth = 1; c.beginPath();
                     for (var d = 0; d < Math.PI * 2; d += 0.16) {
                         c.moveTo(entry.x + Math.cos(d) * ring, entry.y + Math.sin(d) * ring * 0.82);
@@ -185,20 +193,26 @@ FocusScope {
             c.globalCompositeOperation = "source-over";
             c.textAlign = "center";
             entries.forEach(function(entry) {
-                var dim = root.dimmed(entry) ? 0.35 : 1, agent = entry.agent;
+                var dim = root.dimmed(entry) ? 0.35 : 1, agent = entry.agent, text = root.ink(entry);
+                // On the desktop a thin outline of the opposite ink keeps labels apart from a busy wallpaper.
+                var halo = root.css(entry.light === root.light ? theme.background : theme.text, 0.75 * dim);
+                var label = function(value, x, y) {
+                    if (root.backdrop) { c.strokeStyle = halo; c.lineWidth = 3; c.lineJoin = "round"; c.strokeText(value, x, y); }
+                    c.fillText(value, x, y);
+                };
                 entry.files.forEach(function(node) {
-                    c.font = root.font(400, 11); c.fillStyle = root.css(fg, (0.35 + node.heat * 0.55) * dim);
-                    c.fillText(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 + node.heat * 5);
+                    c.font = root.font(400, 11); c.fillStyle = root.css(text, (0.35 + node.heat * 0.55) * dim);
+                    label(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 + node.heat * 5);
                     if ((node.file.added || node.file.removed) && (node.heat > 0.25 || root.service.zooming)) {
-                        c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.role("green"), 0.8 * dim);
-                        c.fillText("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
+                        c.font = root.font(400, 10); c.fillStyle = root.css(root.colors.standOut(root.colors.role("green"), entry.surface), 0.8 * dim);
+                        label("+" + node.file.added + " −" + node.file.removed, node.x, node.y + 33 + node.heat * 5);
                     }
                 });
                 var y = entry.y + 70 * root.scale;
                 c.font = root.font(800, 16); c.fillStyle = root.css(entry.color, dim);
-                c.fillText(Model.agentTitle(agent).toUpperCase(), entry.x, y);
-                c.font = root.font(400, 12); c.fillStyle = root.css(fg, 0.72 * dim);
-                c.fillText(agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
+                label(Model.agentTitle(agent).toUpperCase(), entry.x, y);
+                c.font = root.font(400, 12); c.fillStyle = root.css(text, 0.72 * dim);
+                label(agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
                     : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · "), entry.x, y + 19 * root.scale);
             });
         }
@@ -232,6 +246,7 @@ FocusScope {
         height: 72 * root.scale
         entries: root.scene
         colors: root.colors
+        light: root.wavesLight
         time: root.time
         scale: root.scale
         fontFamily: root.fontFamily

@@ -38,6 +38,12 @@ collector reads local agent session files; nothing else runs outside the shell.
   registers as an open view, so it refreshes at the configured interval, and it
   animates at 15 fps only while an agent is busy or waiting. On the test VM it added about
   2% of a core while covered by windows; an uncovered desktop costs more.
+  `ui/WallpaperProbe.qml` samples the Omarchy wallpaper (the
+  `omarchy/current/background` symlink, resolved every 5 s while shown and
+  again on theme changes) into a 32-column luminance grid once per change.
+  Each agent then draws as on a light or dark background, whichever theme ink
+  stands out more there, shades colors with too little contrast and outlines
+  its labels.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

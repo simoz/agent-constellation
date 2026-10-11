@@ -71,3 +71,14 @@ test('backdrop workspaces', () => {
     assert.ok(!model.validWorkspaces([3, 1]) && !model.validWorkspaces([0]) && !model.validWorkspaces('1'));
     assert.ok(model.showsOnWorkspace([], 7) && model.showsOnWorkspace([2, 7], 7) && !model.showsOnWorkspace([2], 7));
 });
+test('wallpaper luminance picks the ink that stands out', () => {
+    const grid = {columns: 4, rows: 2, values: [0, 0, 1, 1, 0, 0, 1, 1]};
+    assert.equal(model.luminanceAt(grid, 0.1, 0.5, 0.05, 0.5), 0);
+    assert.equal(model.luminanceAt(grid, 0.9, 0.5, 0.05, 0.5), 1);
+    assert.equal(model.luminanceAt(grid, 0.5, 0.5, 0.5, 0.5), 0.5);
+    assert.equal(model.luminanceAt({columns: 4, rows: 2, values: []}, 0.5, 0.5, 0.1, 0.1), -1);
+    assert.equal(model.lightSurface(0.95, 0.1, 0.7), true);
+    assert.equal(model.lightSurface(0.05, 0.1, 0.7), false);
+    // Mid-grey favors the dark ink when the light ink is close to it.
+    assert.equal(model.lightSurface(0.5, 0.1, 0.7), true);
+});

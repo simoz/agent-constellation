@@ -13,6 +13,7 @@ Item {
         property var values: ({})
         property bool light: false
         function role(name) { return Qt.lighter(name === "red" ? "#d27a7a" : "#83b6a6", 1); }
+        function standOut(c, l) { return c; }
         function mix(a, b, k) { return Qt.lighter(a, 1); }
     }
     QtObject {

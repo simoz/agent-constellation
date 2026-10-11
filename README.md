@@ -74,7 +74,8 @@ Open settings with the gear button:
   (on by default), whose **Go to terminal** action focuses that agent's
   terminal, and **Show on the desktop** (off by default): the constellation
   over the wallpaper and below windows on every screen, ignoring the pointer
-  and moving only while an agent is busy or waiting. **Desktop workspaces**
+  and moving only while an agent is busy or waiting. Text and colors turn
+  darker or lighter to follow the wallpaper behind each agent. **Desktop workspaces**
   limits it to some workspaces, such as `3`, `1-5` or `1, 3, 5`; empty shows it
   on all of them.
 - **About**: what is read and shown.

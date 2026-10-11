@@ -44,7 +44,7 @@ Item {
             speed: (0.25 + Model.unit(key + "s") * 0.35) * (root.agent.status === "thinking" ? 0.5 : 1)
             phase: Model.unit(key + "p")
             returning: Model.unit(key + "b") < 0.3
-            ink: returning ? root.colors.role("cyan") : root.ink
+            ink: returning ? root.colors.standOut(root.colors.role("cyan"), root.entry.surface) : root.ink
             // Reading root.time only while active keeps hidden particles out of every frame.
             time: active ? root.time : 0
         }
@@ -59,7 +59,7 @@ Item {
             required property int index
             readonly property var modelData: root.agent.subagents[index] || {name: ""}
             readonly property real ring: (52 + index * 18) * root.scale
-            readonly property color ink: root.colors.role(Model.subagentRole(index))
+            readonly property color ink: root.colors.standOut(root.colors.role(Model.subagentRole(index)), root.entry.surface)
             readonly property real angle: index * 2.4 + root.time * Math.max(0.15, 0.6 - index * 0.12)
             Repeater {
                 model: 8
@@ -119,7 +119,7 @@ Item {
             fillGradient: RadialGradient {
                 centerX: core.radius; centerY: core.radius; centerRadius: core.radius
                 focalX: core.radius; focalY: core.radius
-                GradientStop { position: 0; color: root.colors.light ? root.ink : "#f4ffffff" }
+                GradientStop { position: 0; color: root.entry.light ? root.ink : "#f4ffffff" }
                 GradientStop { position: 0.25; color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.95) }
                 GradientStop { position: 0.6; color: Qt.rgba(root.ink.r, root.ink.g, root.ink.b, 0.3) }
                 GradientStop { position: 1; color: "transparent" }
