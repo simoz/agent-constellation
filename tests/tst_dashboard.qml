@@ -47,6 +47,7 @@ Item {
         property bool notifyWaiting: true
         property bool backdropEnabled: false
         property var backdropWorkspaces: [1, 2, 3]
+        property int backdropBackground: 40
         function agent(id, status) {
             return {id: id, kind: id.split(":")[0], name: "demo", project: "demo-" + id, model: "m", status: status, waitingFor: "",
                 activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1), pids: id === "claude:a" ? [4242, 4200] : [],
@@ -179,6 +180,7 @@ Item {
             keyClick(Qt.Key_Comma, Qt.ControlModifier);
             tryCompare(settings, "opened", true);
             compare(findChild(settings, "workspacesField").text, "1-3");
+            compare(findChild(settings, "backgroundSlider").value, 40);
             keyClick(Qt.Key_Escape);
             tryCompare(settings, "visible", false);
         }

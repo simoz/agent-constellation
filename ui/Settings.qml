@@ -30,6 +30,7 @@ C.Popup {
         claudeDir.text = service.claudeDir; codexDir.text = service.codexDir;
         interval.text = String(service.intervalSeconds); idle.text = String(service.idleMinutes);
         workspaces.text = Model.formatWorkspaces(service.backdropWorkspaces);
+        opacitySlider.value = service.backdropBackground;
         validationError = ""; scroll.contentY = 0;
     }
     background: Rectangle { color: theme.background; Frame { anchors.fill: parent; emphasized: true } }
@@ -143,6 +144,35 @@ C.Popup {
                         placeholderText: "All workspaces, or 3, 1-5, 1, 3, 5"
                         Accessible.name: "Workspaces that show the constellation on the desktop"
                     }
+                    Label { text: "Desktop background · " + Math.round(opacitySlider.value) + "%"; opacity: root.backdrop ? 1 : 0.45 }
+                    C.Slider {
+                        id: opacitySlider
+                        objectName: "backgroundSlider"
+                        Layout.fillWidth: true
+                        enabled: root.backdrop
+                        from: 0; to: 100; stepSize: 5
+                        snapMode: C.Slider.SnapAlways
+                        focusPolicy: Qt.StrongFocus
+                        Accessible.name: "Opacity of the background behind the constellation on the desktop"
+                        C.ToolTip.visible: hovered
+                        C.ToolTip.text: Math.round(value) + "%"
+                        opacity: enabled ? 1 : 0.45
+                        background: Rectangle {
+                            x: opacitySlider.leftPadding; y: opacitySlider.topPadding + opacitySlider.availableHeight / 2 - height / 2
+                            width: opacitySlider.availableWidth; height: 4
+                            color: theme.border
+                            Rectangle { width: opacitySlider.visualPosition * parent.width; height: parent.height; color: theme.accent }
+                        }
+                        handle: Rectangle {
+                            x: opacitySlider.leftPadding + opacitySlider.visualPosition * (opacitySlider.availableWidth - width)
+                            y: opacitySlider.topPadding + opacitySlider.availableHeight / 2 - height / 2
+                            width: 16; height: 16; radius: 8
+                            color: opacitySlider.pressed ? theme.accent : theme.background
+                            border.color: opacitySlider.visualFocus ? theme.text : theme.accent
+                            border.width: 2
+                        }
+                    }
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "The theme background behind the constellation. At 0% text and colors follow the wallpaper; higher values keep them readable on any image."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
                 }
                 ColumnLayout {
                     visible: root.section === 2
@@ -167,7 +197,7 @@ C.Popup {
         ActionButton {
             objectName: "applySettings"; Layout.fillWidth: true; text: "Done"
             onClicked: {
-                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop, workspaces.text.trim());
+                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop, workspaces.text.trim(), Math.round(opacitySlider.value));
                 if (root.validationError === "") root.close();
             }
         }

@@ -15,6 +15,8 @@ FocusScope {
     property bool backdrop: false
     // On the desktop: the wallpaper's luminance grid (WallpaperProbe), or null.
     property var surface: null
+    // On the desktop: opacity of the theme background drawn behind the scene.
+    property real veil: 0
     property int paintCount: 0
     readonly property var colors: service.colors
     readonly property bool light: colors.light
@@ -54,7 +56,7 @@ FocusScope {
     // The token waves sit on the wallpaper too.
     readonly property bool wavesLight: surfaceLight(surfaceAt(surface ? {columns: surface.columns, rows: surface.rows, values: surface.values} : null,
         width / 2, height - 50 * scale, Math.min(width * 0.3, 410 * scale), 40 * scale))
-    readonly property string paintKey: Model.sceneKey(scene) + scene.map(function(e) { return e.light ? 1 : 0; }).join("") + service.selection + service.zooming
+    readonly property string paintKey: Model.sceneKey(scene) + veil + scene.map(function(e) { return e.light ? 1 : 0; }).join("") + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
     // Particles in flight across all agents; each agent gets an equal share, at most 12.
@@ -65,9 +67,11 @@ FocusScope {
                                     files: [], x: 0, y: 0, radius: 1, color: "transparent"})
 
     function css(c, a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + (a === undefined ? c.a : a) + ")"; }
-    // Wallpaper luminance around a point, or -1 off the desktop.
+    // Luminance around a point, wallpaper and background veil together, or -1 off the desktop.
     function surfaceAt(grid, x, y, rx, ry) {
-        return Model.luminanceAt(grid, x / Math.max(1, width), y / Math.max(1, height), rx / Math.max(1, width), ry / Math.max(1, height));
+        var l = Model.luminanceAt(grid, x / Math.max(1, width), y / Math.max(1, height), rx / Math.max(1, width), ry / Math.max(1, height));
+        if (backdrop && veil > 0) l = (l < 0 ? colors.relative(theme.background) : l) * (1 - veil) + colors.relative(theme.background) * veil;
+        return l;
     }
     // Whether the scene draws as on a light background: the theme's own mode, or
     // on the desktop whichever theme ink stands out more on luminance l.
@@ -148,6 +152,28 @@ FocusScope {
                 }
             }
             var entries = root.scene;
+            if (root.backdrop && root.veil > 0 && entries.length) {
+                // The chosen background behind everything drawn, feathered into the
+                // wallpaper by nested rounded rectangles whose opacities add up to veil.
+                var feather = 48 * root.scale, x0 = w, y0 = h, x1 = 0, y1 = 0;
+                var grow = function(x, y) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+                entries.forEach(function(entry) {
+                    grow(entry.x - entry.radius * 1.2, entry.y - entry.radius * 1.2);
+                    grow(entry.x + entry.radius * 1.2, entry.y + 100 * root.scale);
+                    entry.files.forEach(function(node) { grow(node.x - 80 * root.scale, node.y - 30 * root.scale); grow(node.x + 80 * root.scale, node.y + 45 * root.scale); });
+                });
+                grow(w / 2 - Math.min(w * 0.3, 410 * root.scale), h);
+                grow(w / 2 + Math.min(w * 0.3, 410 * root.scale), h - 90 * root.scale);
+                x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(w, x1); y1 = Math.min(h, y1);
+                var steps = 16, step = feather / steps;
+                c.fillStyle = root.css(bg, 1 - Math.pow(1 - root.veil, 1 / steps));
+                for (var s = 0; s < steps; s++) {
+                    var inset = s * step, corner = feather - inset;
+                    c.beginPath();
+                    c.roundedRect(x0 + inset, y0 + inset, x1 - x0 - inset * 2, y1 - y0 - inset * 2, corner, corner);
+                    c.fill();
+                }
+            }
             if (entries.length > 1) {
                 c.strokeStyle = root.css(fg, 0.08); c.lineWidth = 1; c.beginPath();
                 for (var k = 0; k < entries.length; k++) {
