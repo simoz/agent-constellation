@@ -18,6 +18,8 @@ Item {
     property int idleMinutes: 30
     property bool notifyWaiting: true
     property bool backdropEnabled: false
+    // Workspace ids that show the backdrop; empty means every workspace.
+    property var backdropWorkspaces: []
     property var savedConfiguration: ({})
     property var snapshot: null
     property string phase: "idle"
@@ -65,13 +67,15 @@ Item {
     }
     function removeView(token) { views = views.filter(function(v) { return v.token !== token; }); }
 
-    function configure(claude, codex, claudePath, codexPath, interval, idle, notify, backdrop) {
-        var seconds = Number(interval), minutes = Number(idle);
+    function configure(claude, codex, claudePath, codexPath, interval, idle, notify, backdrop, workspaces) {
+        var seconds = Number(interval), minutes = Number(idle), desktops = Model.parseWorkspaces(workspaces || "");
         if (!validPath(claudePath) || !validPath(codexPath) || /[\x00-\x1f]/.test(claudePath + codexPath)) return "Use absolute directory paths.";
         if (!validInterval(seconds)) return "Refresh interval must be 1–10 seconds.";
         if (!validIdle(minutes)) return "Idle sessions must be hidden after 1–1440 minutes.";
+        if (desktops === null) return "Workspaces must be numbers 1–99, such as 3, 1-5 or 1, 3, 5.";
         var config = Object.assign({}, savedConfiguration, {sources: {claude: claude, codex: codex}, claudeDir: claudePath,
-            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false, backdrop: backdrop === true});
+            codexDir: codexPath, intervalSeconds: seconds, idleMinutes: minutes, notifyWaiting: notify !== false, backdrop: backdrop === true,
+            backdropWorkspaces: desktops});
         // updateEntryInline returns whether shell.json changed, not whether saving
         // failed: an entry that is already up to date also returns false.
         if (shell) shell.updateEntryInline("io.github.simoz.agent-constellation", config);
@@ -90,6 +94,7 @@ Item {
         idleMinutes = validIdle(config.idleMinutes) ? config.idleMinutes : 30;
         notifyWaiting = config.notifyWaiting !== false;
         backdropEnabled = config.backdrop === true;
+        backdropWorkspaces = Model.validWorkspaces(config.backdropWorkspaces) ? config.backdropWorkspaces : [];
     }
     // Empty paths select the defaults (CLAUDE_CONFIG_DIR / CODEX_HOME, then ~/.claude and ~/.codex).
     function validPath(path) { return !path || (path[0] === "/" && path.length <= 4096); }

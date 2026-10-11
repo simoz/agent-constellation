@@ -58,3 +58,16 @@ test('the scene key ignores sub-pixel motion and small heat changes', () => {
     assert.notEqual(model.sceneKey([entry(10, 0.6, 1)]), key);
     assert.notEqual(model.sceneKey([entry(10, 0.5, 2)]), key);
 });
+test('backdrop workspaces', () => {
+    assert.deepEqual(Array.from(model.parseWorkspaces('')), []);
+    assert.deepEqual(Array.from(model.parseWorkspaces(' 3 ')), [3]);
+    assert.deepEqual(Array.from(model.parseWorkspaces('1-5')), [1, 2, 3, 4, 5]);
+    assert.deepEqual(Array.from(model.parseWorkspaces('5, 1,3, 3')), [1, 3, 5]);
+    for (const bad of ['0', '5-1', 'a', '1,,2', '100', '-1', '1-'])
+        assert.equal(model.parseWorkspaces(bad), null, bad);
+    assert.equal(model.formatWorkspaces([1, 2, 3, 4, 5]), '1-5');
+    assert.equal(model.formatWorkspaces([1, 2, 5, 7, 8, 9]), '1, 2, 5, 7-9');
+    assert.ok(model.validWorkspaces([1, 3]));
+    assert.ok(!model.validWorkspaces([3, 1]) && !model.validWorkspaces([0]) && !model.validWorkspaces('1'));
+    assert.ok(model.showsOnWorkspace([], 7) && model.showsOnWorkspace([2, 7], 7) && !model.showsOnWorkspace([2], 7));
+});

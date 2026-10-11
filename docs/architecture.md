@@ -31,7 +31,10 @@ collector reads local agent session files; nothing else runs outside the shell.
 - `Backdrop.qml`, loaded by the service when Settings enable it, shows a
   backdrop `Constellation` on every screen in a layer-shell window on the
   `Bottom` layer (above Omarchy's `Background` wallpaper layer, below windows):
-  transparent, click-through (`mask: Region {}`), without keyboard focus. It
+  transparent, click-through (`mask: Region {}`), without keyboard focus. With
+  workspaces chosen in Settings, each screen's window is shown only while the
+  screen's active Hyprland workspace is one of them, so other workspaces cost
+  nothing. It
   registers as an open view, so it refreshes at the configured interval, and it
   animates at 15 fps only while an agent is busy or waiting. On the test VM it added about
   2% of a core while covered by windows; an uncovered desktop costs more.
