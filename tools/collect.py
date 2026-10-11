@@ -161,8 +161,10 @@ def line_count(text) -> int:
 class Tail:
     """Incremental reader of complete JSON lines appended to a file."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, needle: bytes = b""):
         self.path = path
+        # Lines without this text are dropped before parsing, which is most of the cost.
+        self.needle = needle
         self.offset: int | None = None
         self.inode = None
         self.rest = b""
@@ -199,6 +201,8 @@ class Tail:
             self.rest, self.discard = b"", True
         entries = []
         for line in lines:
+            if self.needle not in line:
+                continue
             try:
                 entry = json.loads(line)
             except (ValueError, RecursionError):
@@ -227,11 +231,12 @@ class Agent:
         self.subagents: dict[str, dict] = {}
         self.seen_messages: deque = deque(maxlen=256)
         self.tails: dict[Path, Tail] = {}
+        self.transcript: Path | None = None
         self.pids: list[int] = []
 
-    def tail(self, path: Path) -> Tail:
+    def tail(self, path: Path, needle: bytes = b"") -> Tail:
         if path not in self.tails:
-            self.tails[path] = Tail(path)
+            self.tails[path] = Tail(path, needle)
         return self.tails[path]
 
     def tokens(self, at_ms: int, count) -> None:
@@ -372,23 +377,29 @@ class Collector:
         agent.status = status
         agent.waiting_for = str(record.get("waitingFor") or "")
         agent.pids = ancestry(int(record.get("pid")))
-        transcripts = list(self.claude_dir.glob("projects/*/" + session_id + ".jsonl"))
-        if transcripts:
-            for entry in agent.tail(transcripts[0]).read():
+        # Globbing every project directory each tick costs far more than checking a known path.
+        if agent.transcript is None or not agent.transcript.is_file():
+            agent.transcript = next(self.claude_dir.glob("projects/*/" + session_id + ".jsonl"), None)
+        transcript = agent.transcript
+        if transcript:
+            for entry in agent.tail(transcript, b'"assistant"').read():
                 self.safely(self.claude_entry, agent, entry, "")
-            subagents = sorted(transcripts[0].with_suffix("").glob("subagents/agent-*.jsonl"))[-32:]
-            for sub in subagents:
-                self.safely(self.claude_subagent, agent, sub, at_ms)
+            # Subagent file names are random, so the most recently written ones are kept.
+            listed = []
+            for sub in transcript.with_suffix("").glob("subagents/agent-*.jsonl"):
+                try:
+                    listed.append((sub.stat().st_mtime, sub))
+                except OSError:
+                    pass
+            recent = sorted(listed)[-32:]
+            for modified, sub in recent:
+                self.safely(self.claude_subagent, agent, sub, int(modified * 1000), at_ms)
             # Forget readers of transcripts that are no longer listed.
-            for path in set(agent.tails) - {transcripts[0], *subagents}:
+            for path in set(agent.tails) - {transcript, *(sub for _, sub in recent)}:
                 del agent.tails[path]
 
-    def claude_subagent(self, agent: Agent, path: Path, at_ms: int) -> None:
+    def claude_subagent(self, agent: Agent, path: Path, modified: int, at_ms: int) -> None:
         key = path.stem
-        try:
-            modified = int(path.stat().st_mtime * 1000)
-        except OSError:
-            return
         if key not in agent.subagents and at_ms - modified > SUBAGENT_WINDOW * 1000:
             return
         sub = agent.subagents.get(key)
@@ -401,7 +412,7 @@ class Collector:
             kind = str(meta.get("agentType") or "agent")
             sub = agent.subagents[key] = {"name": str(meta.get("name") or kind), "type": kind, "startedMs": modified, "lastMs": modified}
         sub["lastMs"] = modified
-        for entry in agent.tail(path).read():
+        for entry in agent.tail(path, b'"assistant"').read():
             self.safely(self.claude_entry, agent, entry, sub["name"])
 
     def claude_entry(self, agent: Agent, entry: dict, subagent: str) -> None:
