@@ -2,6 +2,7 @@ import QtQuick
 
 // One tool call in flight along a quadratic curve from the core to a file, with
 // a short trail. Outbound particles leave the core; returning ones head back.
+// Hidden particles stay in the pool with their clock frozen, so they cost nothing per frame.
 Item {
     id: root
     required property real startX
@@ -20,26 +21,19 @@ Item {
     readonly property real cycle: (phase + time * speed) % 1
     readonly property real head: returning ? 1 - cycle : cycle
     Repeater {
-        model: 6
+        model: 4
         Rectangle {
             id: dot
             required property int index
-            readonly property real progress: root.returning ? root.head + index * 0.03 : root.head - index * 0.03
-            readonly property real size: 5.2 * (1 - index / 8)
+            readonly property real progress: root.returning ? root.head + index * 0.05 : root.head - index * 0.05
+            readonly property real size: 5.2 * (1 - index * 0.2)
             visible: progress >= 0 && progress <= 1
             width: size; height: size; radius: size / 2
             color: root.ink
-            opacity: 0.85 * (1 - index / 6)
-            x: path.x - size / 2
-            y: path.y - size / 2
-            PathInterpolator {
-                id: path
-                progress: Math.max(0, Math.min(1, dot.progress))
-                path: Path {
-                    startX: root.startX; startY: root.startY
-                    PathQuad { x: root.endX; y: root.endY; controlX: root.controlX; controlY: root.controlY }
-                }
-            }
+            opacity: 0.85 * (1 - index / 4)
+            // The quadratic Bézier, evaluated directly: cheaper than a PathInterpolator per dot.
+            x: (1 - progress) * ((1 - progress) * root.startX + 2 * progress * root.controlX) + progress * progress * root.endX - size / 2
+            y: (1 - progress) * ((1 - progress) * root.startY + 2 * progress * root.controlY) + progress * progress * root.endY - size / 2
         }
     }
 }

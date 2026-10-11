@@ -20,17 +20,22 @@ Item {
     x: entry.x
     y: entry.y
 
-    // Particles: outbound in the agent color, returning results in cyan.
+    // Particles: outbound in the agent color, returning results in cyan. The
+    // pool has a fixed size, the agent's share of the scene budget, so activity
+    // changes only show or hide particles instead of creating them.
+    required property int particleLimit
     readonly property int particleCount: {
         var recent = agent.activityBuckets.slice(-3).reduce(function(a, b) { return a + b; }, 0);
-        return busy && entry.files.length ? Math.min(12, 3 + recent * 2) : 0;
+        return busy && entry.files.length ? Math.min(particleLimit, 3 + recent * 2) : 0;
     }
     Repeater {
-        model: root.particleCount
+        model: root.particleLimit
         Particle {
             required property int index
+            readonly property bool active: index < root.particleCount
             readonly property string key: root.agent.id + "#" + index
             readonly property var node: root.entry.files[Math.floor(Model.unit(key + "n") * Math.min(root.entry.files.length, 6))]
+            visible: active
             x: -root.x; y: -root.y
             startX: root.entry.x; startY: root.entry.y
             // Particles being removed may outlive their file node for one evaluation.
@@ -40,7 +45,8 @@ Item {
             phase: Model.unit(key + "p")
             returning: Model.unit(key + "b") < 0.3
             ink: returning ? root.colors.role("cyan") : root.ink
-            time: root.time
+            // Reading root.time only while active keeps hidden particles out of every frame.
+            time: active ? root.time : 0
         }
     }
 
