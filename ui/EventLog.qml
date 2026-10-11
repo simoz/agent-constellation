@@ -10,6 +10,8 @@ Item {
     required property var service
     readonly property var events: service.selection
         ? service.events.filter(function(e) { return e.agent === service.selection; }) : service.events
+    // Rows being removed still evaluate their bindings once; they see this inert event.
+    readonly property var vacant: ({atMs: 0, agent: "", subagent: "", tool: "", target: ""})
     readonly property real rowHeight: Math.max(22, theme.size * 1.7)
     Theme { id: theme }
     implicitHeight: 74 + rowHeight * 6
@@ -36,7 +38,7 @@ Item {
         x: 14; y: 66
         width: parent.width - 24
         height: root.height - 74
-        model: root.events
+        model: Rows { size: root.events.length }
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         activeFocusOnTab: count > 0
@@ -52,7 +54,8 @@ Item {
         }
         delegate: Row {
             id: line
-            required property var modelData
+            required property int index
+            readonly property var modelData: root.events[index] || root.vacant
             readonly property var agent: root.service.agentById(modelData.agent)
             width: list.width - 10
             height: root.rowHeight

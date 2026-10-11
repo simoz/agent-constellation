@@ -11,6 +11,9 @@ Item {
     required property var service
     readonly property real rowHeight: Math.max(104, theme.size * 8)
     property alias list: list
+    // Rows being removed still evaluate their bindings once; they see this inert agent.
+    readonly property var vacant: ({id: "", kind: "", project: "", model: "", status: "idle", waitingFor: "", activity: null,
+                                    toolCalls: 0, outputTokens: 0, activityBuckets: [], subagents: [], pids: []})
     Theme { id: theme }
     Frame { anchors.fill: parent; emphasized: root.service.selection !== "" }
     Label {
@@ -35,15 +38,15 @@ Item {
         x: 12; y: 66
         width: parent.width - 20
         height: Math.max(root.rowHeight, root.height - 74)
-        model: root.service.agents
+        model: Rows { size: root.service.agents.length }
         clip: true
         spacing: 6
         boundsBehavior: Flickable.StopAtBounds
         C.ScrollBar.vertical: C.ScrollBar {}
         delegate: C.ItemDelegate {
             id: card
-            required property var modelData
             required property int index
+            readonly property var modelData: root.service.agents[index] || root.vacant
             readonly property bool selected: root.service.selection === modelData.id
             readonly property color ink: root.service.agentColor(modelData)
             width: list.width - 8
