@@ -63,12 +63,16 @@ UI.BarWidget {
             Constellation.ConstellationIcon {
                 objectName: "constellationBarIcon"
                 ink: root.waiting ? button.alert : button.foreground
-                SequentialAnimation on opacity {
-                    running: root.waiting > 0 && root.service && root.service.moving
-                    loops: Animation.Infinite
-                    onRunningChanged: if (!running) parent.opacity = 1
-                    NumberAnimation { to: 0.35; duration: 600; easing.type: Easing.InOutSine }
-                    NumberAnimation { to: 1; duration: 600; easing.type: Easing.InOutSine }
+                // A timer blink renders the bar twice a second; an animation would
+                // render it at the display refresh rate for the whole wait.
+                property bool faded: false
+                opacity: faded ? 0.35 : 1
+                Timer {
+                    interval: 600
+                    repeat: true
+                    running: root.waiting > 0 && root.service !== null && root.service.moving
+                    onTriggered: parent.faded = !parent.faded
+                    onRunningChanged: if (!running) parent.faded = false
                 }
             }
             Grid {
