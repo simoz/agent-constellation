@@ -17,7 +17,8 @@ C.Popup {
     property bool backdrop: false
     onSectionChanged: scroll.contentY = 0
     width: Math.min(560, parent.width - 24)
-    height: Math.min(parent.height - 24, 620)
+    // From below the header to the bottom edge.
+    height: parent.height - 70
     x: Math.max(12, parent.width - width - 12)
     y: Math.max(12, Math.min(58, parent.height - height - 12))
     padding: 16
