@@ -39,7 +39,7 @@ FocusScope {
                     files: Model.fileNodes(agent, x, y, radius)};
         });
     }
-    readonly property string paintKey: JSON.stringify(service.snapshot ? service.snapshot.sequence : 0) + service.selection + service.zooming
+    readonly property string paintKey: Model.sceneKey(scene) + service.selection + service.zooming
         + width + "x" + height + String(theme.background) + String(theme.text) + JSON.stringify(colors.values) + light
     onPaintKeyChanged: base.requestPaint()
     // Delegates being removed when the scene shrinks still evaluate their bindings
