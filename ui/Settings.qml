@@ -61,7 +61,8 @@ C.Popup {
             contentHeight: body.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            C.ScrollBar.vertical: C.ScrollBar {}
+            // Always shown when sections overflow, so the options below the fold are discoverable.
+            C.ScrollBar.vertical: C.ScrollBar { policy: scroll.contentHeight > scroll.height ? C.ScrollBar.AlwaysOn : C.ScrollBar.AsNeeded }
             ColumnLayout {
                 id: body
                 width: scroll.width - 12
