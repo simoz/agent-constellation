@@ -110,6 +110,20 @@ Item {
             keyClick(Qt.Key_Space);
             compare(service.selection, "");
         }
+        function test_snapshots_keep_cards_and_focus() {
+            var list = dashboard.agentList.list;
+            list.currentIndex = 1;
+            list.currentItem.forceActiveFocus();
+            var card = list.itemAtIndex(1);
+            service.agents = [service.agent("claude:a", "working"), service.agent("codex:b", "working")];
+            compare(list.itemAtIndex(1), card);
+            verify(card.activeFocus);
+            compare(card.modelData.status, "working");
+            service.agents = [service.agent("claude:a", "working")];
+            compare(list.count, 1);
+            service.agents = [service.agent("claude:a", "working"), service.agent("codex:b", "waiting")];
+            compare(list.count, 2);
+        }
         function test_terminal_goes_to_focused_card_or_selection() {
             var button = findChild(dashboard, "terminalButton");
             verify(!button.enabled);

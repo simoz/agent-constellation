@@ -76,9 +76,11 @@ UI.BarWidget {
                 columns: root.vertical ? 1 : 5
                 spacing: 3
                 Repeater {
-                    model: root.agents.slice(0, 5)
+                    // A count keeps the dots across snapshots, which arrive as new arrays.
+                    model: Math.min(5, root.agents.length)
                     Rectangle {
-                        required property var modelData
+                        required property int index
+                        readonly property var modelData: root.agents[index] || {id: "", status: "idle"}
                         width: 6; height: 6; radius: 3
                         color: root.service.agentColor(modelData)
                         opacity: modelData.status === "idle" ? 0.45 : 1

@@ -6,7 +6,9 @@ Canvas {
     property var values: []
     property color ink: "white"
     implicitHeight: 28
-    onValuesChanged: requestPaint()
+    // Snapshots bring a new array every second; repaint only when the values differ.
+    readonly property string key: values.join()
+    onKeyChanged: requestPaint()
     onInkChanged: requestPaint()
     onWidthChanged: requestPaint()
     function css(a) { return "rgba(" + Math.round(ink.r * 255) + "," + Math.round(ink.g * 255) + "," + Math.round(ink.b * 255) + "," + a + ")"; }
