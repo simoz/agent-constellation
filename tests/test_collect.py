@@ -134,6 +134,35 @@ class CollectorTest(unittest.TestCase):
         self.assertEqual(agent["activity"]["subagent"], "explorer")
         self.assertNotIn("private", json.dumps(agent))
 
+    def test_newest_subagents_are_kept(self):
+        self.session()
+        self.append(self.transcripts / "s1.jsonl", tool("Read", {"file_path": PROJECT + "/a.rb"}, "m1"))
+        folder = self.transcripts / "s1" / "subagents"
+        now = time.time()
+        for index in range(32):
+            path = folder / f"agent-b{index:02}.jsonl"
+            self.append(path, tool("Grep", {"pattern": "x"}, f"b{index}", sidechain=True))
+            os.utime(path, (now - 10 + index / 4, now - 10 + index / 4))
+        # Sorts first by name but was written last.
+        self.append(folder / "agent-a-newest.jsonl", tool("Grep", {"pattern": "y"}, "a1", sidechain=True))
+        collector = self.collector()
+        collector.snapshot("r")
+        read = collector.agents["claude:s1"].subagents
+        self.assertIn("agent-a-newest", read)
+        self.assertNotIn("agent-b00", read)
+
+    def test_moved_transcript_is_found_again(self):
+        self.session()
+        self.append(self.transcripts / "s1.jsonl", tool("Read", {"file_path": PROJECT + "/a.rb"}, "m1"))
+        collector = self.collector()
+        collector.snapshot("r1")
+        moved = self.claude / "projects" / "-home-tester-other" / "s1.jsonl"
+        moved.parent.mkdir()
+        (self.transcripts / "s1.jsonl").rename(moved)
+        self.append(moved, tool("Edit", {"file_path": PROJECT + "/b.rb", "old_string": "a", "new_string": "b"}, "m2"))
+        agent = collector.snapshot("r2")["agents"][0]
+        self.assertEqual(agent["activity"]["tool"], "Edit")
+
     def test_codex_rollout(self):
         day = self.codex / "sessions" / time.strftime("%Y/%m/%d")
         rollout = day / "rollout-2026-10-10T10-00-00-abc.jsonl"
