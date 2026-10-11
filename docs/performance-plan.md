@@ -24,82 +24,23 @@ Before and after each change:
 
 Make one commit per item.
 
-## Plan
+## Done
 
-### 1. Repaint the static canvas only when its content changes
+Items 1–4 of the original plan, one commit each. Preview CPU (the whole `qs`
+process, 30 s on the `demo/scenario.py` sessions with three agents, on the
+aarch64 VM), moving / with `CONSTELLATION_STILL=1`:
 
-`ui/Constellation.qml` puts `snapshot.sequence` in `paintKey`, and the collector
-increments it on every reply (`tools/collect.py`, `self.sequence += 1`). So the
-full-window canvas is rasterized and uploaded every second even when nothing
-visible changed. That means about 30 MB per screen per second on a 4K backdrop,
-and probably a hitch in the animation once a second. An "idle" backdrop still
-pays this cost.
+| Step | Moving | Still |
+| --- | --- | --- |
+| Before | 25.5% | 8.1% |
+| 1. Static canvas repaints only when its content key changes | 20.5% | 4.3% |
+| 2. List delegates kept across snapshots (`ui/Rows.qml`) | 19.6% | 4.8% |
+| 3. Particles: direct Bézier, 4-dot trails, fixed pool, budget of 48 | 12.7% | 3.2% |
+| 4. Bar icon blinks with a 600 ms `Timer` | not measurable in the preview | |
 
-- Replace the sequence with a key built from what the canvas draws:
-  - per agent: id, status, model, `waitingFor`, title, activity text, subagent
-    count, color, and the core position rounded to whole pixels;
-  - per file: path, position rounded to whole pixels, heat in 0.05 steps, added
-    and removed lines.
-- Keep the existing selection, zoom, size and theme parts of the key.
-- Heat decays slowly once the top score is below 1, so whole-pixel positions
-  repaint only every few seconds while it decays.
-
-Rejected: moving the vignette, grid and stars to a second canvas. Halos and
-glows use the `lighter` composite mode in dark themes. On a separate transparent
-canvas they would be blended source-over instead of added to the background, so
-hot files would look slightly darker. The content key alone makes repaints rare.
-
-### 2. Stop rebuilding lists on every snapshot
-
-`ui/AgentList.qml`, `ui/EventLog.qml` and the dots in `BarWidget.qml` use JS
-arrays as `model`. When the content changes, `ListView.setModel` clears every
-delegate, creates them again, resets the position to the top and resets
-`currentIndex` to 0. With working agents this happens about once a second.
-
-Visible effects:
-- the event log cannot stay scrolled;
-- agent cards lose keyboard focus;
-- tooltips close.
-
-Check first: scroll the event log while an agent works.
-
-Fix:
-- Use a row model that appends and removes rows only at the end (a `ListModel`
-  kept at the array's length).
-- Delegates read `service.agents[index]` or `events[index]`, with an inert
-  fallback object for rows being removed.
-- A plain integer `model` is not enough: changing the count also resets the
-  view.
-- `Sparkline` should repaint only when `values.join()` changes, not on every new
-  array.
-
-### 3. Make particles cheaper per frame
-
-Particles are the main per-frame cost, estimated at about 85% of the bindings
-evaluated per tick. Each trail dot in `ui/Particle.qml` has a `PathInterpolator`,
-a `Path` and a `PathQuad`, plus about 5 bindings. With 12 particles × 6 dots,
-that is about 400 binding evaluations per agent per tick, or about 40k per
-second for three agents. This is consistent with the measured 11% of a core.
-
-In order of effort:
-- Compute the quadratic Bézier directly in `x`/`y` (`Particle` already has
-  `controlX`/`controlY`) and drop `PathInterpolator`.
-- Use 3–4 dots per trail instead of 6, spaced further apart.
-- Keep a fixed pool of 12 particles per agent instead of changing the Repeater
-  model in `ui/AgentMotion.qml`. Today each activity change creates or destroys
-  25 objects per particle. Hidden particles must freeze `time` so they do not
-  keep evaluating.
-- Add a global particle budget across agents. The worst case today, 24 agents,
-  is about 7000 objects.
-
-Expected: about half the per-frame cost. Measure it.
-
-### 4. Bar icon blink without vsync animation
-
-While an agent waits, the `SequentialAnimation on opacity` in `BarWidget.qml`
-re-renders the bar at the display refresh rate (60–144 fps), on every monitor,
-for the whole wait. Replace it with a `Timer`-driven blink (about 2 frames per
-second), or pulse only for the first ~10 s and then stay red.
+The demo agents change activity about every second, so the canvas still
+repaints often there; an idle backdrop now stays unpainted. Item 4 needs a check
+in the real bar while an agent waits.
 
 ## Later, medium priority
 
@@ -125,4 +66,4 @@ second), or pulse only for the first ~10 s and then stay red.
 The single 30 fps scene clock is the right design. `Animator`, `NumberAnimation`
 and `QtQuick.Particles` would run at vsync and break the cap. A `ShaderEffect`
 where only `time` changes per frame would be the last step, but it means
-shipping precompiled `.qsb` shaders. Do not start it before items 1–4.
+shipping precompiled `.qsb` shaders. Items 1–4 are done; measure the remaining cost before starting it.
