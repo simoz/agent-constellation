@@ -7,13 +7,19 @@ import "ui" as Constellation
 import "Model.js" as Model
 
 // The constellation drawn on every screen's desktop: above the Omarchy wallpaper,
-// below windows, transparent and click-through. It moves only while an agent is
-// busy or waiting, so an idle desktop costs nothing per frame. Inks follow the
-// wallpaper's brightness behind each agent.
+// below windows and click-through. It moves only while an agent is busy or
+// waiting, so an idle desktop costs nothing per frame. Full screen, its inks
+// follow the wallpaper's brightness behind each agent; as a widget it sits on a
+// card in the theme's colors, in its own layer namespace so a Hyprland rule can
+// blur the wallpaper behind the card alone.
 Item {
     id: root
     property var service: null
     readonly property bool lively: service !== null && service.totals.busy + service.totals.waiting > 0
+    readonly property bool widget: service !== null && service.backdropStyle === "widget"
+    readonly property var size: Model.widgetSizes[service ? service.widgetSize : "medium"]
+    readonly property string corner: service ? service.widgetCorner : "top-right"
+    Constellation.Theme { id: theme }
     onServiceChanged: if (service) service.setView(root, true)
     Component.onDestruction: if (service) service.removeView(root)
     // The Omarchy wallpaper: a symlink that changes without any event we can
@@ -29,11 +35,11 @@ Item {
         interval: 5000
         repeat: true
         triggeredOnStart: true
-        running: root.service !== null && root.service.agents.length > 0
+        running: root.service !== null && root.service.agents.length > 0 && !root.widget
         onTriggered: if (!resolve.running) resolve.running = true
     }
     Variants {
-        model: Quickshell.screens
+        model: root.widget ? [] : Quickshell.screens
         PanelWindow {
             required property var modelData
             screen: modelData
@@ -74,6 +80,50 @@ Item {
                 // Slow drift on the desktop: half the panel's frame rate.
                 frameInterval: 66
                 opacity: 0.9
+            }
+        }
+    }
+    Variants {
+        model: root.widget ? Quickshell.screens : []
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            readonly property var monitor: Hyprland.monitorFor(modelData)
+            readonly property int workspace: monitor && monitor.activeWorkspace ? monitor.activeWorkspace.id : 0
+            visible: root.service !== null && root.service.agents.length > 0
+                && Model.showsOnWorkspace(root.service.backdropWorkspaces, workspace)
+            color: "transparent"
+            implicitWidth: root.size.width
+            implicitHeight: root.size.height
+            anchors {
+                top: root.corner.indexOf("top") === 0
+                bottom: root.corner.indexOf("bottom") === 0
+                left: root.corner.indexOf("left") > 0
+                right: root.corner.indexOf("right") > 0
+            }
+            // Respects the bar's exclusive zone, like a window would.
+            margins { top: 16; bottom: 16; left: 16; right: 16 }
+            mask: Region {}
+            WlrLayershell.namespace: "agent-constellation-widget"
+            WlrLayershell.layer: WlrLayer.Bottom
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            Rectangle {
+                anchors.fill: parent
+                radius: 18
+                color: theme.fade(theme.background, 0.8)
+                border.color: theme.fade(theme.text, 0.1)
+                border.width: 1
+            }
+            Constellation.Constellation {
+                anchors.fill: parent
+                anchors.margins: 14
+                service: root.service
+                backdrop: true
+                card: true
+                fileLabels: root.service !== null && root.service.widgetSize === "large"
+                waves: root.service !== null && root.service.widgetSize !== "small"
+                active: root.lively
+                frameInterval: 66
             }
         }
     }

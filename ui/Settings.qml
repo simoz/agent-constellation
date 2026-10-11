@@ -15,6 +15,9 @@ C.Popup {
     property bool codex: true
     property bool notify: true
     property bool backdrop: false
+    property string style: "screen"
+    property string corner: "top-right"
+    property string size: "medium"
     onSectionChanged: scroll.contentY = 0
     width: Math.min(560, parent.width - 24)
     // From below the header to the bottom edge.
@@ -30,6 +33,7 @@ C.Popup {
         claudeDir.text = service.claudeDir; codexDir.text = service.codexDir;
         interval.text = String(service.intervalSeconds); idle.text = String(service.idleMinutes);
         workspaces.text = Model.formatWorkspaces(service.backdropWorkspaces);
+        style = service.backdropStyle; corner = service.widgetCorner; size = service.widgetSize;
         validationError = ""; scroll.contentY = 0;
     }
     background: Rectangle { color: theme.background; Frame { anchors.fill: parent; emphasized: true } }
@@ -143,6 +147,68 @@ C.Popup {
                         placeholderText: "All workspaces, or 3, 1-5, 1, 3, 5"
                         Accessible.name: "Workspaces that show the constellation on the desktop"
                     }
+                    Label { text: "Desktop style"; opacity: root.backdrop ? 1 : 0.45 }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Repeater {
+                            model: [{value: "screen", label: "Full screen", hint: "Spread the constellation over the whole wallpaper"},
+                                    {value: "widget", label: "Widget", hint: "Show the constellation on a card in a corner of the desktop"}]
+                            ActionButton {
+                                required property var modelData
+                                objectName: "style-" + modelData.value
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                enabled: root.backdrop
+                                text: modelData.label
+                                hint: modelData.hint
+                                selected: root.style === modelData.value
+                                onClicked: root.style = modelData.value
+                            }
+                        }
+                    }
+                    Label { text: "Widget corner"; opacity: root.backdrop && root.style === "widget" ? 1 : 0.45 }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: 2
+                        columnSpacing: 4
+                        rowSpacing: 4
+                        Repeater {
+                            model: [{value: "top-left", label: "Top left"}, {value: "top-right", label: "Top right"},
+                                    {value: "bottom-left", label: "Bottom left"}, {value: "bottom-right", label: "Bottom right"}]
+                            ActionButton {
+                                required property var modelData
+                                objectName: "corner-" + modelData.value
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                enabled: root.backdrop && root.style === "widget"
+                                text: modelData.label
+                                hint: "Place the widget in the " + modelData.label.toLowerCase() + " corner"
+                                selected: root.corner === modelData.value
+                                onClicked: root.corner = modelData.value
+                            }
+                        }
+                    }
+                    Label { text: "Widget size"; opacity: root.backdrop && root.style === "widget" ? 1 : 0.45 }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        Repeater {
+                            model: [{value: "small", label: "Small"}, {value: "medium", label: "Medium"}, {value: "large", label: "Large"}]
+                            ActionButton {
+                                required property var modelData
+                                objectName: "size-" + modelData.value
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 1
+                                enabled: root.backdrop && root.style === "widget"
+                                text: modelData.label
+                                hint: modelData.label + " widget"
+                                selected: root.size === modelData.value
+                                onClicked: root.size = modelData.value
+                            }
+                        }
+                    }
+                    Label { Layout.fillWidth: true; wrapMode: Text.Wrap; text: "The widget sits on a card in the theme's colors. For a frosted-glass card, add the Hyprland blur rule from the README."; font.pixelSize: theme.size * 0.85; color: theme.subdued }
                 }
                 ColumnLayout {
                     visible: root.section === 2
@@ -167,7 +233,7 @@ C.Popup {
         ActionButton {
             objectName: "applySettings"; Layout.fillWidth: true; text: "Done"
             onClicked: {
-                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop, workspaces.text.trim());
+                root.validationError = root.service.configure(root.claude, root.codex, claudeDir.text.trim(), codexDir.text.trim(), interval.text.trim(), idle.text.trim(), root.notify, root.backdrop, workspaces.text.trim(), root.style, root.corner, root.size);
                 if (root.validationError === "") root.close();
             }
         }

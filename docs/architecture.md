@@ -46,7 +46,14 @@ collector reads local agent session files; nothing else runs outside the shell.
   too little contrast toward that ink, and sets its labels on a soft glow of the
   opposite ink (a canvas shadow cast from text drawn off the canvas, so the
   glyphs keep their color). Desktop text is 15% larger than in the panel
-  (`textScale`), since it is read from further away.
+  (`textScale`), since it is read from further away. The **Widget** style
+  instead shows one card per screen in a corner, sized by `Model.widgetSizes`,
+  in the `agent-constellation-widget` layer namespace and respecting the bar's
+  exclusive zone. The card is the scene's background, so inks are the theme's
+  own and labels need no glow (`card`); its text keeps a fixed size while the
+  drawing scales down (`textUnit`), and smaller sizes drop file labels and the
+  token waves. Hyprland can blur the wallpaper behind the card with a layer rule
+  on that namespace (README); plugins cannot ship compositor rules.
 - `ui/Palette.qml` reads named colors from the active theme's `colors.toml`,
   because the host `Color` singleton exposes only foreground, background,
   accent, urgent and muted. It reloads whenever those host colors change.

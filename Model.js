@@ -200,3 +200,10 @@ function luminanceAt(grid, u, v, ru, rv) {
 function lightSurface(surface, dark, light) {
     return (surface + 0.05) / (dark + 0.05) > (light + 0.05) / (surface + 0.05);
 }
+
+// Desktop styles: the full-screen constellation over the wallpaper, or a card in
+// one corner, like a desktop widget. Sizes are in logical pixels.
+var desktopStyles = ["screen", "widget"];
+var widgetCorners = ["top-left", "top-right", "bottom-left", "bottom-right"];
+var widgetSizes = {small: {width: 440, height: 300}, medium: {width: 600, height: 400}, large: {width: 800, height: 520}};
+function validChoice(value, list) { return typeof value === "string" && list.indexOf(value) >= 0; }

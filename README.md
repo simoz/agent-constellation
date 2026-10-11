@@ -77,8 +77,18 @@ Open settings with the gear button:
   and moving only while an agent is busy or waiting. Text and colors turn
   darker or lighter to follow the wallpaper behind each agent. **Desktop workspaces**
   limits it to some workspaces, such as `3`, `1-5` or `1, 3, 5`; empty shows it
-  on all of them.
+  on all of them. **Desktop style** chooses **Full screen** or **Widget**: a
+  card in the theme's colors in one corner (**Widget corner**), in three sizes
+  (**Widget size**). The small widget shows cores, titles and status; the
+  large one adds file names.
 - **About**: what is read and shown.
+
+For a frosted-glass widget like macOS desktop widgets, let Hyprland blur the
+wallpaper behind the card (Omarchy's Lua config, `~/.config/hypr/hyprland.lua`):
+
+```lua
+hl.layer_rule({ match = { namespace = "agent-constellation-widget" }, blur = true, ignore_alpha = 0.5 })
+```
 
 **Done** saves the changes. Invalid values keep the editor open. **Esc** or
 clicking outside closes without saving.

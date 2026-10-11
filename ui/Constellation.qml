@@ -17,6 +17,12 @@ FocusScope {
     property var surface: null
     // Text size relative to the panel's; the desktop reads from further away.
     property real textScale: 1
+    // On the desktop: drawn on the widget card rather than straight on the wallpaper.
+    property bool card: false
+    // File names and line counts; the small widget leaves them out.
+    property bool fileLabels: true
+    // The token-rate waves along the bottom; the small widget leaves them out.
+    property bool waves: true
     property int paintCount: 0
     readonly property var colors: service.colors
     readonly property bool light: colors.light
@@ -30,7 +36,9 @@ FocusScope {
     property double lastFrame: 0
     readonly property bool running: active && visible && presented && service.moving && width > 0 && height > 0
     readonly property string fontFamily: theme.font
-    readonly property real scale: Math.max(0.75, Math.min(1.25, Math.min(width, height) / 760))
+    // The widget card shrinks the drawing further but keeps its text at textScale.
+    readonly property real scale: Math.max(card ? 0.5 : 0.75, Math.min(1.25, Math.min(width, height) / 760))
+    readonly property real textUnit: (card ? 1 : scale) * textScale
     Theme { id: theme }
 
     // Layout in pixels, recomputed with the snapshot or the size.
@@ -80,9 +88,16 @@ FocusScope {
     }
     // Text ink for an entry: the theme's text, or its background where that stands out more.
     function ink(entry) { return entry.light === light ? theme.text : theme.background; }
+    // Text cut with an ellipsis to at most width pixels in the context's font.
+    function fit(c, text, width) {
+        if (c.measureText(text).width <= width) return text;
+        var n = text.length;
+        while (n > 1 && c.measureText(text.slice(0, n) + "…").width > width) n--;
+        return text.slice(0, n).trim() + "…";
+    }
     function dimmed(entry) { return service.selection !== "" && entry.agent.id !== service.selection; }
     function zoomTo(id) { service.selection = id; service.zoomed = true; }
-    function font(weight, size) { return weight + " " + Math.round(size * scale * textScale) + "px \"" + fontFamily + "\""; }
+    function font(weight, size) { return weight + " " + Math.round(size * textUnit) + "px \"" + fontFamily + "\""; }
     function dashed(c, x1, y1, x2, y2, dash, gap) {
         var length = Math.hypot(x2 - x1, y2 - y1), step = dash + gap;
         for (var d = 0; d < length; d += step) {
@@ -201,7 +216,7 @@ FocusScope {
                 // it never tints the glyphs; labels are also less faded there.
                 var halo = root.css(entry.light === root.light ? theme.background : theme.text, 0.9 * dim);
                 var label = function(value, x, y) {
-                    if (root.backdrop) {
+                    if (root.backdrop && !root.card) {
                         var fill = c.fillStyle, away = w + 1000;
                         c.fillStyle = halo; c.strokeStyle = halo; c.lineWidth = 4 * root.scale; c.lineJoin = "round";
                         c.shadowColor = halo; c.shadowBlur = 6 * root.scale; c.shadowOffsetX = away;
@@ -210,7 +225,7 @@ FocusScope {
                     }
                     c.fillText(value, x, y);
                 };
-                entry.files.forEach(function(node) {
+                if (root.fileLabels) entry.files.forEach(function(node) {
                     c.font = root.font(400, 11); c.fillStyle = root.css(text, (root.backdrop ? 0.65 + node.heat * 0.35 : 0.35 + node.heat * 0.55) * dim);
                     label(root.service.zooming ? Model.shortPath(node.path, 40) : node.name, node.x, node.y + 20 * root.textScale + node.heat * 5);
                     if ((node.file.added || node.file.removed) && (node.heat > 0.25 || root.service.zooming)) {
@@ -222,8 +237,11 @@ FocusScope {
                 c.font = root.font(800, 16); c.fillStyle = root.css(entry.color, dim);
                 label(Model.agentTitle(agent).toUpperCase(), entry.x, y);
                 c.font = root.font(400, 12); c.fillStyle = root.css(text, (root.backdrop ? 0.9 : 0.72) * dim);
-                label(agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
-                    : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · "), entry.x, y + 19 * root.scale * root.textScale);
+                var status = agent.status === "waiting" ? "⚠ WAITING · " + (agent.waitingFor || "input needed")
+                    : [agent.model, Model.activityText(agent.activity)].filter(function(t) { return t; }).join(" · ");
+                // On the widget card agents sit close together: shorten the line to its share of the width.
+                if (root.card) status = root.fit(c, status, w * 0.38);
+                label(status, entry.x, y + 19 * root.textUnit);
             });
         }
     }
@@ -242,7 +260,7 @@ FocusScope {
                 entry: root.scene[index] || root.vacant
                 colors: root.colors
                 scale: root.scale
-                textScale: root.textScale
+                textScale: root.textUnit / root.scale
                 fontFamily: root.fontFamily
                 time: root.time
                 particleLimit: root.particleLimit
@@ -252,6 +270,7 @@ FocusScope {
     }
     TokenWaves {
         objectName: "tokenWaves"
+        visible: root.waves
         anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 14 }
         width: Math.min(parent.width * 0.6, 820 * root.scale)
         height: 72 * root.scale
@@ -260,7 +279,7 @@ FocusScope {
         light: root.wavesLight
         time: root.time
         scale: root.scale
-        textScale: root.textScale
+        textScale: root.textUnit / root.scale
         fontFamily: root.fontFamily
     }
     // The scene edges glow red while any agent waits for input.

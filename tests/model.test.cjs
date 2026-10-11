@@ -58,6 +58,14 @@ test('the scene key ignores sub-pixel motion and small heat changes', () => {
     assert.notEqual(model.sceneKey([entry(10, 0.6, 1)]), key);
     assert.notEqual(model.sceneKey([entry(10, 0.5, 2)]), key);
 });
+test('desktop widget choices', () => {
+    assert.equal(model.validChoice('widget', model.desktopStyles), true);
+    assert.equal(model.validChoice('panel', model.desktopStyles), false);
+    assert.equal(model.validChoice('bottom-left', model.widgetCorners), true);
+    assert.equal(model.validChoice(undefined, model.widgetCorners), false);
+    assert.deepEqual(Object.keys(model.widgetSizes), ['small', 'medium', 'large']);
+});
+
 test('backdrop workspaces', () => {
     assert.deepEqual(Array.from(model.parseWorkspaces('')), []);
     assert.deepEqual(Array.from(model.parseWorkspaces(' 3 ')), [3]);

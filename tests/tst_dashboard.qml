@@ -47,6 +47,9 @@ Item {
         property bool notifyWaiting: true
         property bool backdropEnabled: false
         property var backdropWorkspaces: [1, 2, 3]
+        property string backdropStyle: "widget"
+        property string widgetCorner: "bottom-left"
+        property string widgetSize: "small"
         function agent(id, status) {
             return {id: id, kind: id.split(":")[0], name: "demo", project: "demo-" + id, model: "m", status: status, waitingFor: "",
                 activity: null, toolCalls: 1, outputTokens: 10, tokensPerMinute: 5, activityBuckets: Array(30).fill(1), pids: id === "claude:a" ? [4242, 4200] : [],
@@ -179,6 +182,15 @@ Item {
             keyClick(Qt.Key_Comma, Qt.ControlModifier);
             tryCompare(settings, "opened", true);
             compare(findChild(settings, "workspacesField").text, "1-3");
+            // Repeater delegates are visual children only, which findChild does not search.
+            var find = function(item, name) {
+                if (item.objectName === name) return item;
+                for (var i = 0; i < item.children.length; i++) { var found = find(item.children[i], name); if (found) return found; }
+                return null;
+            };
+            compare(find(settings.contentItem, "style-widget").selected, true);
+            compare(find(settings.contentItem, "corner-bottom-left").selected, true);
+            compare(find(settings.contentItem, "size-small").selected, true);
             keyClick(Qt.Key_Escape);
             tryCompare(settings, "visible", false);
         }
